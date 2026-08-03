@@ -144,8 +144,15 @@ Phase 1 — that unchanged UI is the proof the abstraction was correct.
   AES-GCM keyed by the MLS epoch secret (HKDF), epoch-tagged for in-flight **key rotation**,
   installs via `RTCRtpScriptTransform`/`createEncodedStreams`. ⚠️ Leaves the codec header
   bytes clear (10 key / 3 delta video, 1 audio) so browsers still depacketize
-- ⏳ Wiring it live: ferry MLS handshakes over the data channel, sync MLS membership to the
-  lobby, and turn it on for the SFU path (the mesh is already E2EE, so it needs it only there)
+- ✅ **MLS group flow verified** by native tests (`crypto/mls/tests/`): two/three parties
+  derive the *same* frame secret, and removing a member rotates the key + advances the epoch
+- ✅ **E2EE coordinator** (`web/src/core/crypto/E2eeSession.ts`): host-as-sole-committer group
+  management — publishes key packages, adds admitted peers (commit broadcast + welcome
+  unicast), rotates on leave, and keeps the frame cipher keyed to the current epoch — all over
+  the existing E2EE data channel
+- ⏳ Wiring it live: run the coordinator on the **SFU path**, sync MLS membership to the lobby,
+  and handle **host handoff** (transfer the committer role). The mesh is already E2EE, so this
+  only needs to switch on once media flows through a relay
 - Honest, always-visible encryption indicator: mesh-E2EE / SFU-E2EE / hop-by-hop
 - Documented, tested fallback for browsers lacking Insertable Streams
 
