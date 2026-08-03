@@ -5,50 +5,268 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Samvad SFU — test client</title>
     <style>
+      :root {
+        --base: #14110f;
+        --surface: #1c1815;
+        --surface-2: #262019;
+        --line: #362d24;
+        --ink: #f2ede6;
+        --ink-muted: #b8aa9c;
+        --ink-faint: #7c7167;
+        --accent: #e8a33d;
+        --teal: #4a9e8f;
+        --danger: #d96a5b;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
       body {
         margin: 0;
-        font-family: system-ui, sans-serif;
-        background: #14110f;
-        color: #eee;
+        height: 100%;
       }
+      body {
+        display: flex;
+        flex-direction: column;
+        font-family:
+          ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        background:
+          radial-gradient(1200px 600px at 80% -10%, rgba(232, 163, 61, 0.08), transparent 60%),
+          var(--base);
+        color: var(--ink);
+        -webkit-font-smoothing: antialiased;
+      }
+
       header {
-        padding: 12px 16px;
-        border-bottom: 1px solid #333;
-        font-size: 14px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--line);
+        background: rgba(20, 17, 15, 0.7);
+        backdrop-filter: blur(12px);
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        min-width: 0;
+      }
+      .mark {
+        width: 26px;
+        height: 26px;
+        flex: none;
+      }
+      .brand h1 {
+        font-size: 15px;
+        font-weight: 600;
+        margin: 0;
+        letter-spacing: -0.01em;
+      }
+      .brand .sub {
+        font-size: 12px;
+        color: var(--ink-faint);
+        margin-top: 1px;
+      }
+      .right {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex: none;
+      }
+      .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 11px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--surface);
+        font-size: 12.5px;
+      }
+      .chip .k {
+        color: var(--ink-faint);
+      }
+      .chip .room {
+        font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 5px 12px;
+        border-radius: 999px;
+        font-size: 12.5px;
+        font-weight: 500;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        transition: color 0.2s;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 999px;
+        background: var(--ink-faint);
+      }
+      .pill[data-state='connecting'] {
+        color: var(--accent);
+      }
+      .pill[data-state='connecting'] .dot {
+        background: var(--accent);
+        animation: pulse 1.2s ease-in-out infinite;
+      }
+      .pill[data-state='connected'] {
+        color: var(--teal);
+      }
+      .pill[data-state='connected'] .dot {
+        background: var(--teal);
+        box-shadow: 0 0 0 3px rgba(74, 158, 143, 0.18);
+      }
+      .pill[data-state='error'],
+      .pill[data-state='disconnected'] {
+        color: var(--danger);
+      }
+      .pill[data-state='error'] .dot,
+      .pill[data-state='disconnected'] .dot {
+        background: var(--danger);
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.35;
+        }
+      }
+
+      main {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 16px;
       }
       #grid {
         display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 8px;
-        padding: 12px;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 12px;
       }
-      video {
-        width: 100%;
-        aspect-ratio: 16/9;
-        object-fit: cover;
+      .tile {
+        position: relative;
+        aspect-ratio: 16 / 9;
+        border-radius: 14px;
+        overflow: hidden;
         background: #000;
-        border-radius: 8px;
+        box-shadow: inset 0 0 0 1px var(--line);
+        animation: rise 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
       }
-      .tag {
-        color: #e8a33d;
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(8px) scale(0.99);
+        }
+      }
+      .tile video {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+      .tile.self video {
+        transform: scaleX(-1); /* mirror your own view, like a mirror */
+      }
+      .tile .label {
+        position: absolute;
+        left: 10px;
+        bottom: 10px;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        font-size: 12.5px;
+        font-weight: 500;
+        color: #fff;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(8px);
+      }
+      .tile .label .swatch {
+        width: 7px;
+        height: 7px;
+        border-radius: 999px;
+      }
+
+      footer {
+        padding: 10px 20px 16px;
+        color: var(--ink-faint);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      footer code {
+        color: var(--ink-muted);
+        font-family: ui-monospace, Menlo, monospace;
       }
     </style>
   </head>
   <body>
     <header>
-      Samvad self-hosted SFU — bare test client (not the app UI). Room:
-      <span class="tag" id="room"></span> · <span id="status">connecting…</span>. Open this
-      page in two tabs (or on two devices) with the same <code>?room=</code>.
+      <div class="brand">
+        <svg class="mark" viewBox="0 0 32 32" aria-hidden="true">
+          <circle cx="12" cy="16" r="9" fill="#e8a33d" fill-opacity="0.9" />
+          <circle cx="20" cy="16" r="9" fill="#4a9e8f" fill-opacity="0.85" />
+        </svg>
+        <div>
+          <h1>Samvad · SFU</h1>
+          <div class="sub">self-hosted media server — test client</div>
+        </div>
+      </div>
+      <div class="right">
+        <span class="chip"><span class="k">room</span><span class="room" id="room"></span></span>
+        <span class="pill" id="status" data-state="connecting"
+          ><span class="dot"></span><span id="statusText">connecting…</span></span
+        >
+      </div>
     </header>
-    <div id="grid">
-      <video id="local" autoplay playsinline muted></video>
-    </div>
+
+    <main>
+      <div id="grid"></div>
+    </main>
+
+    <footer>
+      A bare harness for verifying the self-hosted SFU — <strong>not</strong> the Samvad app
+      UI. Open this page in two tabs (or two devices) with the same
+      <code>?room=</code> to see media flow through the SFU rather than peer-to-peer.
+    </footer>
 
     <script>
       const room = new URLSearchParams(location.search).get('room') || 'demo'
       document.getElementById('room').textContent = room
-      const status = document.getElementById('status')
       const grid = document.getElementById('grid')
+      const statusEl = document.getElementById('status')
+      const statusText = document.getElementById('statusText')
+      const setStatus = (state, text) => {
+        statusEl.dataset.state = state
+        statusText.textContent = text
+      }
+
+      // Build a labelled video tile.
+      function makeTile(stream, label, isSelf, swatch) {
+        const tile = document.createElement('div')
+        tile.className = 'tile' + (isSelf ? ' self' : '')
+        const v = document.createElement('video')
+        v.autoplay = true
+        v.playsInline = true
+        v.muted = isSelf // never echo your own audio
+        v.srcObject = stream
+        const tag = document.createElement('span')
+        tag.className = 'label'
+        tag.innerHTML = `<span class="swatch" style="background:${swatch}"></span>${label}`
+        tile.append(v, tag)
+        return tile
+      }
 
       const pc = new RTCPeerConnection({
         iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
@@ -59,15 +277,12 @@
       pc.ontrack = (e) => {
         const stream = e.streams[0]
         if (!stream || remotes.has(stream.id)) return
-        remotes.set(stream.id, stream)
-        const v = document.createElement('video')
-        v.autoplay = true
-        v.playsInline = true
-        v.srcObject = stream
-        grid.appendChild(v)
+        const tile = makeTile(stream, `Guest ${remotes.size + 1}`, false, 'var(--teal)')
+        remotes.set(stream.id, tile)
+        grid.appendChild(tile)
         stream.addEventListener('removetrack', () => {
           if (stream.getTracks().length === 0) {
-            v.remove()
+            tile.remove()
             remotes.delete(stream.id)
           }
         })
@@ -79,12 +294,17 @@
           ws?.send(JSON.stringify({ event: 'candidate', data: JSON.stringify(e.candidate) }))
         }
       }
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'connected') setStatus('connected', 'connected')
+        else if (['failed', 'disconnected'].includes(pc.connectionState))
+          setStatus('disconnected', pc.connectionState)
+      }
 
       function openSocket() {
         const scheme = location.protocol === 'https:' ? 'wss' : 'ws'
         ws = new WebSocket(`${scheme}://${location.host}/sfu?room=${encodeURIComponent(room)}`)
-        ws.onopen = () => (status.textContent = 'connected')
-        ws.onclose = () => (status.textContent = 'disconnected')
+        ws.onopen = () => setStatus('connecting', 'negotiating…')
+        ws.onclose = () => setStatus('disconnected', 'disconnected')
         ws.onmessage = async (evt) => {
           const msg = JSON.parse(evt.data)
           if (msg.event === 'offer') {
@@ -108,12 +328,13 @@
       navigator.mediaDevices
         .getUserMedia({ video: true, audio: true })
         .then((stream) => {
-          document.getElementById('local').srcObject = stream
+          grid.appendChild(makeTile(stream, 'You', true, 'var(--accent)'))
           for (const track of stream.getTracks()) pc.addTrack(track, stream)
           openSocket()
         })
         .catch((err) => {
-          status.textContent = 'camera/mic error: ' + err.message
+          setStatus('error', 'camera/mic blocked')
+          console.error(err)
           openSocket()
         })
     </script>
