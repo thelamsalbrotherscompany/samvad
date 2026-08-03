@@ -1,5 +1,6 @@
 import { Popover } from 'radix-ui'
 import { ControlButton } from '@/design/primitives'
+import { PluginToolbar } from '@/core/plugins/PluginHost'
 import {
   ChatIcon,
   GridIcon,
@@ -9,7 +10,6 @@ import {
   MicIcon,
   MicOffIcon,
   MoreIcon,
-  ReactIcon,
   ScreenShareIcon,
   SettingsIcon,
   SpeakerViewIcon,
@@ -46,7 +46,6 @@ type Props = {
   onOpenChat: () => void
   /** Unread chat messages — badged on the Chat control (and the mobile More button). */
   chatUnread: number
-  onReact: (emoji: string) => void
   onLockView: () => void
   onLeave: () => void
   onEndForAll: () => void
@@ -72,7 +71,6 @@ export function ControlBar({
   onOpenParticipants,
   onOpenChat,
   chatUnread,
-  onReact,
   onLockView,
   onLeave,
   onEndForAll,
@@ -152,7 +150,8 @@ export function ControlBar({
 
         <div className="mx-1 h-7 w-px bg-line" />
 
-        {!alone && <ReactionControl onReact={onReact} />}
+        {/* Plugin-contributed toolbar controls (e.g. the reactions picker). */}
+        {!alone && <PluginToolbar />}
 
         {alone ? (
           // Solo: only self-setup actions remain, few enough to sit inline everywhere.
@@ -196,45 +195,6 @@ type SecondaryAction = {
   /** Unread count badged on the control (0 = none). */
   badge?: number
   onClick?: () => void
-}
-
-const REACTIONS = ['👍', '❤️', '😂', '🎉', '👏', '😮', '🙌', '🔥']
-
-/** Emoji reaction picker — a popover of quick reactions sent P2P to everyone. */
-function ReactionControl({ onReact }: { onReact: (emoji: string) => void }) {
-  return (
-    <Popover.Root>
-      <Popover.Trigger asChild>
-        <button
-          aria-label="Send a reaction"
-          className="inline-grid size-10 place-items-center rounded-full text-ink-muted transition-all duration-200 ease-out hover:bg-surface-2 hover:text-ink active:scale-95"
-        >
-          <span className="size-4.75 [&_svg]:size-full">
-            <ReactIcon />
-          </span>
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          side="top"
-          sideOffset={14}
-          className="z-50 flex gap-0.5 rounded-2xl border border-line/80 bg-surface/95 p-1.5 shadow-2xl backdrop-blur-2xl"
-        >
-          {REACTIONS.map((e) => (
-            <Popover.Close asChild key={e}>
-              <button
-                onClick={() => onReact(e)}
-                aria-label={`React with ${e}`}
-                className="grid size-10 place-items-center rounded-xl text-2xl transition-transform duration-150 hover:scale-125 hover:bg-surface-2"
-              >
-                {e}
-              </button>
-            </Popover.Close>
-          ))}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
-  )
 }
 
 /** A small accent count badge for a control (chat unread, etc.). */

@@ -63,7 +63,14 @@ useful on its own terms, even with everything below unbuilt.
 
 *The differentiator, and it lands before the SFU on purpose — it works fine over mesh.*
 
-- Plugin host: manifest parsing, capability grants, worker sandbox
+- ✅ **Plugin host** (`web/src/core/plugins/`): the public contract from docs/PLUGINS.md §1
+  (`SamvadPlugin`, capability manifest, `PluginContext`), a **capability-gated context**
+  (a method/slot a plugin didn't declare isn't attached, or throws), **UI slots**
+  (toolbar, tile-overlay, stage-overlay), and **E2EE data topics** (namespaced per plugin,
+  over the same P2P channel as media). ⚠️ First-party, **in-process** for now — the Worker
+  sandbox that strips `fetch`/etc. from untrusted plugins, manifest integrity hashes, and
+  `video-transform`/`audio-transform`/`network`/`storage` capabilities are declared in the
+  types but not yet enforced
 - Media pipeline: `MediaStreamTrackProcessor` chain in a worker, shared WebGL2 context
 - Frame-budget enforcement and auto-disable on repeated overrun
 - Reference plugins: **background blur**, **background replace**, noise suppression
@@ -81,7 +88,11 @@ useful on its own terms, even with everything below unbuilt.
     never uploaded, never persisted; falls back to blur while it loads. `Settings →
     Background → Image` opens a local file picker. Bundling stock backgrounds and
     pipeline-based noise suppression are what's left of the effects set
-- UI slots and data-channel topics
+- ✅ UI slots and data-channel topics (part of the plugin host above)
+- ✅ **Reactions rebuilt as a first-party plugin** (`web/src/plugins/reactions/`) — the
+  dogfood test of the API (docs/PLUGINS.md §8). It declares one data topic + two UI slots
+  and imports **only** the public plugin API (plus the design system) — no core internals.
+  Reactions behave identically; they just no longer live in core. Chat is next to migrate
 - ✅ **Chat** shipped (`web/src/features/room/ChatPanel.tsx`): text rides the **WebRTC data
     channels** (one negotiated channel per peer), so it's **E2EE and never touches the
     signalling server** — no middlebox can read it. Ephemeral (no history; late joiners see

@@ -23,10 +23,16 @@ import { useMesh } from '@/core/transport/useMesh'
 import { useRoom } from '@/core/room/useRoom'
 import { generateRoomId } from '@/core/room/roomId'
 import { getSessionId, getCreatedRoom, setCreatedRoom } from '@/core/room/session'
+import { PluginHost } from '@/core/plugins/PluginHost'
+import reactionsPlugin from '@/plugins/reactions'
 import { useIdle } from '@/lib/useIdle'
 import { useIsNarrow } from '@/lib/useMediaQuery'
 import { DEFAULT_SETTINGS, type Settings } from '@/lib/settings'
 import { cn } from '@/lib/cn'
+
+// First-party plugins, loaded with every call. Each is built on the public plugin API
+// only — no privileged core access (docs/PLUGINS.md).
+const PLUGINS = [reactionsPlugin]
 
 export default function App() {
   const { roomId, enterRoom, leaveRoom } = useRoom()
@@ -206,17 +212,9 @@ export default function App() {
   )
   const speakingId = active.dominantId
 
-  // Latest live reaction per participant, so it can pop on their tile (self reactions
-  // land on the self tile). Cleared automatically as reactions expire from the mesh.
-  const reactionByParticipant = new Map<string, { id: string; emoji: string }>()
-  for (const r of mesh.reactions) {
-    reactionByParticipant.set(r.self ? 'self' : r.senderId, { id: r.id, emoji: r.emoji })
-  }
-
   const withLiveState = roster.map((p) => ({
     ...p,
     speaking: active.speakingIds.has(p.id) && !p.muted,
-    reaction: reactionByParticipant.get(p.id),
   }))
 
   const self = withLiveState.find((p) => p.isSelf) ?? withLiveState[0]
@@ -291,7 +289,11 @@ export default function App() {
             }}
           />
         ) : (
-          <>
+          <PluginHost
+            plugins={PLUGINS}
+            selfId={selfParticipant.id}
+            data={{ send: mesh.sendData, subscribe: mesh.subscribeData }}
+          >
             <TileActionsContext.Provider
               value={{
                 canManage: mesh.isHost,
@@ -363,7 +365,6 @@ export default function App() {
               onOpenParticipants={() => setParticipantsOpen(true)}
               onOpenChat={() => setChatOpen(true)}
               chatUnread={chatUnread}
-              onReact={mesh.sendReaction}
               onLockView={() => setLocked(true)}
               onLeave={() => {
                 setLocked(false)
@@ -402,7 +403,7 @@ export default function App() {
                 </button>
               </div>
             )}
-          </>
+          </PluginHost>
         )}
 
         {inRoom && (

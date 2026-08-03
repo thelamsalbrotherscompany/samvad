@@ -4,9 +4,11 @@ import {
   type ActivityEvent,
   type ChatMessage,
   type Phase,
-  type Reaction,
   type RemotePeer,
 } from './MeshTransport'
+
+/** A handler for messages arriving on a plugin data topic. */
+export type DataHandler = (payload: unknown, from: string) => void
 import type { PeerInfo } from './protocol'
 
 type Options = {
@@ -34,7 +36,6 @@ export type Mesh = {
   peers: RemotePeer[]
   knocks: PeerInfo[]
   messages: ChatMessage[]
-  reactions: Reaction[]
   activity: ActivityEvent[]
   admit: (id: string) => void
   deny: (id: string) => void
@@ -42,7 +43,10 @@ export type Mesh = {
   kick: (id: string) => void
   end: () => void
   sendChat: (text: string) => void
-  sendReaction: (emoji: string) => void
+  /** Send plugin data on a topic (whole room, or one peer). E2EE, P2P. */
+  sendData: (topic: string, payload: unknown, opts?: { to?: string }) => void
+  /** Subscribe to a plugin data topic. Returns an unsubscribe fn. */
+  subscribeData: (topic: string, handler: DataHandler) => () => void
 }
 
 /**
@@ -58,9 +62,11 @@ export function useMesh(opts: Options): Mesh {
   const [isHost, setIsHost] = useState(false)
   const [lobbyOpen, setLobbyOpenState] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
-  const [reactions, setReactions] = useState<Reaction[]>([])
   const [activity, setActivity] = useState<ActivityEvent[]>([])
   const ref = useRef<MeshTransport | null>(null)
+  // Plugin topic subscribers, kept in a ref so the transport's onData handler (set once at
+  // construction) always dispatches to the current set.
+  const subscribersRef = useRef(new Map<string, Set<DataHandler>>())
 
   useEffect(() => {
     if (!opts.enabled) return
@@ -86,10 +92,8 @@ export function useMesh(opts: Options): Mesh {
         onKnocks: setKnocks,
         onLobbyOpen: setLobbyOpenState,
         onChat: (m) => setMessages((prev) => [...prev, m]),
-        onReaction: (r) => {
-          setReactions((prev) => [...prev, r])
-          // Transient — drop it once it has risen and faded (matches the tile animation).
-          setTimeout(() => setReactions((prev) => prev.filter((x) => x.id !== r.id)), 2800)
+        onData: (topic, from, payload) => {
+          subscribersRef.current.get(topic)?.forEach((h) => h(payload, from))
         },
         onActivity: (e) => setActivity((prev) => [...prev, e]),
       },
@@ -103,7 +107,6 @@ export function useMesh(opts: Options): Mesh {
       setPeers([])
       setKnocks([])
       setMessages([])
-      setReactions([])
       setActivity([])
       setConnected(false)
       setPhase('connecting')
@@ -140,7 +143,24 @@ export function useMesh(opts: Options): Mesh {
   const kick = useCallback((id: string) => ref.current?.kick(id), [])
   const end = useCallback(() => ref.current?.end(), [])
   const sendChat = useCallback((text: string) => ref.current?.sendChat(text), [])
-  const sendReaction = useCallback((emoji: string) => ref.current?.sendReaction(emoji), [])
+  const sendData = useCallback(
+    (topic: string, payload: unknown, opts?: { to?: string }) =>
+      ref.current?.sendData(topic, payload, opts),
+    [],
+  )
+  const subscribeData = useCallback((topic: string, handler: DataHandler) => {
+    const map = subscribersRef.current
+    let set = map.get(topic)
+    if (!set) {
+      set = new Set()
+      map.set(topic, set)
+    }
+    set.add(handler)
+    return () => {
+      set.delete(handler)
+      if (set.size === 0) map.delete(topic)
+    }
+  }, [])
 
   return {
     connected,
@@ -150,7 +170,6 @@ export function useMesh(opts: Options): Mesh {
     peers,
     knocks,
     messages,
-    reactions,
     activity,
     admit,
     deny,
@@ -158,6 +177,7 @@ export function useMesh(opts: Options): Mesh {
     kick,
     end,
     sendChat,
-    sendReaction,
+    sendData,
+    subscribeData,
   }
 }

@@ -39,15 +39,6 @@ export type ChatMessage = {
   self: boolean
 }
 
-/** A transient emoji reaction — floats up and vanishes, never stored. Same E2EE path. */
-export type Reaction = {
-  id: string
-  senderId: string
-  senderName: string
-  emoji: string
-  self: boolean
-}
-
 /** A join/left event, so the host can see who came and went mid-call. In-memory only. */
 export type ActivityEvent = {
   id: string
@@ -79,7 +70,7 @@ type Handlers = {
   onKnocks: (knocks: PeerInfo[]) => void
   onLobbyOpen: (open: boolean) => void
   onChat: (msg: ChatMessage) => void
-  onReaction: (r: Reaction) => void
+  onData: (topic: string, from: string, payload: unknown) => void
   onActivity: (e: ActivityEvent) => void
 }
 
@@ -281,17 +272,25 @@ export class MeshTransport {
     })
   }
 
-  /** Broadcast a transient emoji reaction to every connected peer. */
-  sendReaction(emoji: string): void {
-    if (!emoji) return
-    this.broadcastData(JSON.stringify({ t: 'reaction', name: this.identity.name, emoji }))
-    this.handlers.onReaction({
-      id: crypto.randomUUID(),
-      senderId: this.selfId,
-      senderName: this.identity.name,
-      emoji,
-      self: true,
-    })
+  /**
+   * Send arbitrary plugin data on a topic — to the whole room or one peer. Rides the same
+   * P2P data channel as chat, so it's E2EE and never touches the server. Own sends are not
+   * echoed back; the plugin handles its own local effect.
+   */
+  sendData(topic: string, payload: unknown, opts?: { to?: string }): void {
+    const wire = JSON.stringify({ t: 'topic', topic, payload })
+    if (opts?.to) {
+      const ch = this.chatChannels.get(opts.to)
+      if (ch?.readyState === 'open') {
+        try {
+          ch.send(wire)
+        } catch {
+          // Channel mid-close.
+        }
+      }
+      return
+    }
+    this.broadcastData(wire)
   }
 
   private broadcastData(payload: string): void {
@@ -307,27 +306,24 @@ export class MeshTransport {
   }
 
   private onDataMessage(peerId: string, raw: string): void {
-    let data: { t?: unknown; name?: unknown; text?: unknown; emoji?: unknown; ts?: unknown }
+    let data: { t?: unknown; name?: unknown; text?: unknown; ts?: unknown; topic?: unknown; payload?: unknown }
     try {
       data = JSON.parse(raw) as typeof data
     } catch {
       return
     }
-    const peer = this.peers.get(peerId)
-    const senderName =
-      typeof data.name === 'string' && data.name ? data.name : peer?.name || 'Guest'
 
-    if (data.t === 'reaction' && typeof data.emoji === 'string' && data.emoji) {
-      this.handlers.onReaction({
-        id: crypto.randomUUID(),
-        senderId: peerId,
-        senderName,
-        emoji: data.emoji,
-        self: false,
-      })
+    // Plugin traffic: relay to the topic dispatcher.
+    if (data.t === 'topic' && typeof data.topic === 'string') {
+      this.handlers.onData(data.topic, peerId, data.payload)
       return
     }
-    if (typeof data.text === 'string' && data.text) {
+
+    // Core chat.
+    if (data.t === 'chat' && typeof data.text === 'string' && data.text) {
+      const peer = this.peers.get(peerId)
+      const senderName =
+        typeof data.name === 'string' && data.name ? data.name : peer?.name || 'Guest'
       this.handlers.onChat({
         id: crypto.randomUUID(),
         senderId: peerId,
