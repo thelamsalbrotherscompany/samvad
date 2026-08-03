@@ -1,0 +1,141 @@
+/* Fonts are bundled, never fetched at runtime. No CDN — see docs/DESIGN.md. */
+@import '@fontsource/ibm-plex-sans/400.css';
+@import '@fontsource/ibm-plex-sans/500.css';
+@import '@fontsource/ibm-plex-sans/600.css';
+@import '@fontsource/ibm-plex-sans-devanagari/400.css';
+@import '@fontsource/ibm-plex-sans-devanagari/600.css';
+@import '@fontsource/ibm-plex-mono/400.css';
+@import 'tailwindcss';
+
+/* ─────────────────────────────────────────────────────────────
+   Design tokens — the single source of truth.
+   No component may hardcode a hex value. Changing the entire
+   visual direction should mean editing only this block.
+   ───────────────────────────────────────────────────────────── */
+@theme {
+  /* Surfaces — warm charcoal, brown-tinted. Never blue-grey, never pure black. */
+  --color-base: #14110f;
+  --color-surface: #1e1a17;
+  --color-surface-2: #2a2521;
+  --color-line: #3a332d;
+
+  /* Text — warm off-white; pure #fff is harsh on dark. */
+  --color-ink: #f5f0ea;
+  --color-ink-muted: #a69b90;
+  --color-ink-faint: #6b625a;
+
+  /* Accents — marigold earns attention by being rare. */
+  --color-accent: #e8a33d;
+  --color-accent-soft: #3a2c17;
+  --color-accent-2: #4a9e8f;
+  --color-danger: #d96a5b;
+  --color-danger-soft: #3a201c;
+  --color-live: #6bbf8a;
+
+  /* Type */
+  --font-sans:
+    'IBM Plex Sans', 'IBM Plex Sans Devanagari', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* Motion — everything eases, nothing snaps. */
+  --ease-settle: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --radius-tile: 12px;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-base);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    /* A call is a fixed-viewport surface, not a scrolling document. */
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  #root {
+    height: 100svh;
+  }
+
+  /* Visible focus, always. Accessibility is not optional — see docs/DESIGN.md. */
+  :focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  ::selection {
+    background: var(--color-accent);
+    color: var(--color-base);
+  }
+}
+
+/* Non-negotiable: all motion collapses under prefers-reduced-motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@layer utilities {
+  /* Scrollable without a visible scrollbar — for filmstrips and dense rails. */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* A gentle "look here" pulse for attention requests — raised hands. */
+@keyframes samvad-attention {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.08);
+  }
+}
+
+@keyframes samvad-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes samvad-breathe {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes samvad-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}

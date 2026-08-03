@@ -1,0 +1,18 @@
+name = "samvad-signal"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+# One Durable Object class, one instance per room. State is in memory only.
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "RoomDO"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["RoomDO"]
+
+# TURN (optional). Without these, /ice serves STUN only — a direct-only mesh. To enable
+# Cloudflare Realtime TURN for restrictive networks, create a TURN key in the Cloudflare
+# dashboard (Realtime → TURN) and set the two secrets (never commit them):
+#   bunx wrangler secret put TURN_KEY_ID
+#   bunx wrangler secret put TURN_API_TOKEN

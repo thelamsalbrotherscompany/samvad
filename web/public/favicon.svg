@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Two overlapping voices sharing one space. -->
+  <rect width="32" height="32" rx="8" fill="#14110F" />
+  <circle cx="12.5" cy="16" r="8" fill="#E8A33D" />
+  <circle cx="19.5" cy="16" r="8" fill="#4A9E8F" opacity="0.9" />
+</svg>

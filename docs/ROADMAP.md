@@ -1,0 +1,180 @@
+# Samvad — Roadmap
+
+Ordered to keep something **demonstrable and shippable at every phase**. The SFU is the
+hardest part and it is deliberately *not* first — Phase 1 delivers a real, working
+video call while the SFU is still unwritten.
+
+---
+
+## Phase 0 — Shell and design system
+
+*No media. Prove the product feels right before making it work.*
+
+- Design tokens: color, type scale, spacing, motion, elevation
+- Core primitives: Button, Toggle, Tooltip, Dialog, Popover, Avatar, Tile
+- Screens: landing, pre-join (device check, mic meter, camera preview), in-room, post-call
+- Stage layout engine with fake participants — grid, spotlight, sidebar; smooth reflow
+- Go binary serving the embedded Vite build
+
+**Done when:** a fake 12-person meeting is navigable and genuinely looks designed.
+Clickable, no WebRTC.
+
+---
+
+## Phase 1 — Real calls, mesh only
+
+*Ship a working product.*
+
+- ✅ Camera/mic capture, device switching, mute both directions, live level, graceful
+  no-/partial-device fallback (`web/src/core/media/`)
+- ✅ Worker + `RoomDO` Durable Object: WebSocket signalling, in-memory membership,
+  Hibernation API from the start (`worker/`)
+- ✅ `Transport` interface + `MeshTransport` — client peer connections over the signalling
+  DO, with per-peer audio/video and echo cancellation (`web/src/core/transport/`)
+- ✅ Rooms: friendly slug ids, hash-based routing, home/create/join, real shareable links
+  (`web/src/core/room/`). Passphrase-derived deterministic ids (Argon2id → BLAKE2b, tied
+  to the E2EE key) come with encryption
+- ✅ `stun.cloudflare.com` + Cloudflare Realtime **TURN**, for the ~15% of networks that
+  can't connect directly. The worker serves `/ice`; with `TURN_KEY_ID` + `TURN_API_TOKEN`
+  secrets set, it mints short-lived TURN credentials server-side (the API token never
+  reaches the browser) and returns STUN + TURN, else STUN only. TURN relays *encrypted*
+  RTP — it's a blind forwarder, not a media service, so it stays inside the
+  non-negotiables (`worker/src/ice.ts`)
+- ✅ Screen share (real capture): `getDisplayMedia` on a **dedicated PC per viewer**, so it
+  never renegotiates the camera/mic link — the presenter offers, viewers answer, no glare.
+  A `sharing` presence flag drives teardown; the shared screen takes the featured stage. The
+  camera path is untouched (`web/src/core/transport/MeshTransport.ts`). Captured audio
+  routing is deferred
+- ✅ Reconnect on network drop: per-tab session id + a ~30s in-RAM grace window in the
+  `RoomDO` — a drop/refresh reclaims the same spot (and host role) without re-knocking; a
+  deliberate leave gets no grace. Client auto-reconnects with backoff. Best-effort by
+  design: the grace lives in DO memory, so a solo-host refresh instead recreates the room
+  from a persisted create-intent (`worker/src/room.ts`, `web/src/core/transport/`)
+
+**Done when:** four people on four networks hold a real conversation.
+Mesh is genuinely E2EE — there is no middlebox to trust.
+
+**This is the first public release.** Small-group, private, self-hostable. Complete and
+useful on its own terms, even with everything below unbuilt.
+
+---
+
+## Phase 2 — Plugin system and effects
+
+*The differentiator, and it lands before the SFU on purpose — it works fine over mesh.*
+
+- Plugin host: manifest parsing, capability grants, worker sandbox
+- Media pipeline: `MediaStreamTrackProcessor` chain in a worker, shared WebGL2 context
+- Frame-budget enforcement and auto-disable on repeated overrun
+- Reference plugins: **background blur**, **background replace**, noise suppression
+  - ✅ **Background blur** shipped as a real effect (`web/src/core/effects/`): MediaPipe
+    Selfie Segmenter (WASM + model **vendored in `public/mediapipe/`, no CDN**, lazy-loaded
+    only when enabled) segments the person; the background is blurred and composited on a
+    canvas, captured back into the published stream — so **peers see the blur too**, not
+    just the local view. Graceful fallback to the raw camera when unsupported. ⚠️ Built in
+    `core/` for now to prove the pipeline; per non-negotiable #7 it must be **re-expressed
+    through the public plugin API** once the plugin host lands. Compositing runs on the main
+    thread — the worker + shared-WebGL2 move is still pending
+  - ✅ **Background replace** (virtual background): the same pipeline, generalised
+    (`BackgroundEffect`) to composite the person over a **user-picked image** instead of a
+    blurred frame. The image is read to a data URL and kept **in memory on-device only** —
+    never uploaded, never persisted; falls back to blur while it loads. `Settings →
+    Background → Image` opens a local file picker. Bundling stock backgrounds and
+    pipeline-based noise suppression are what's left of the effects set
+- UI slots and data-channel topics
+- Chat and reactions rebuilt *as plugins*, to prove the API is real
+
+**Done when:** a contributor writes a working effect plugin using only public docs, and
+it cannot reach the network.
+
+---
+
+## Phase 3 — Scale past mesh, via Cloudflare Realtime SFU
+
+*Much smaller than it would have been. Workers can't run an SFU (no UDP sockets), so this
+is an integration, not a media server. Weeks, not months — see ARCHITECTURE §4.*
+
+- `RealtimeTransport` behind the existing interface
+- Automatic mesh→SFU promotion at the 5th join, invisible to users
+- Simulcast: publish 3 layers, select per receiver
+- ✅ Active-speaker detection via audio energy — done early at the mesh level
+  (`web/src/core/media/useActiveSpeaker.ts`): WebAudio RMS per source drives the speaking
+  rings and a *sticky* dominant-remote pick for the featured tile (holds through pauses,
+  switches only on a clear margin). Client-side and transport-agnostic, so it carries into
+  the SFU unchanged
+- Subscribe-to-visible: off-screen tiles cost nothing
+- Egress budgeting and a visible usage indicator — the free tier is 1,000 GB
+
+**Done when:** 30 participants hold a stable call and the UI code is unchanged from
+Phase 1 — that unchanged UI is the proof the abstraction was correct.
+
+---
+
+## Phase 4 — End-to-end encryption over the SFU
+
+- Insertable Streams (`RTCRtpScriptTransform`) frame encryption
+- **MLS (RFC 9420) via OpenMLS**, Rust → WASM, following the Orange Meets design.
+  Gives real forward secrecy and clean removal of departed participants
+- ⚠️ Leave the first 1–10 VP8 header bytes unencrypted or browsers fail depacketization.
+  Budget for this rather than rediscovering it
+- Key rotation on join and leave
+- Honest, always-visible encryption indicator: mesh-E2EE / SFU-E2EE / hop-by-hop
+- Documented, tested fallback for browsers lacking Insertable Streams
+
+**Done when:** packet capture at the SFU yields no intelligible media, and the SFU's own
+logs demonstrably cannot reconstruct a frame.
+
+---
+
+## Phase 5 — Classroom scale
+
+- Classroom mode: one presenter publishes video; participants are audio-first
+- Hand-raise, speaking queue, presenter handoff
+- Moderation: mute-all, remove, lock room, waiting room
+- Pagination for large grids
+- Adaptive quality on constrained downlinks
+
+**Done when:** a 40-person class runs for an hour without intervention.
+
+---
+
+## Phase 6 — Trust, sovereignty, and polish
+
+- **`PionTransport`** — a self-hosted Go + Pion SFU in `selfhost/`, for anyone who declines
+  to trust Cloudflare. This is what keeps the project from being vendor-captured, and it's
+  the honest answer to THREAT-MODEL §4
+- Published threat model, reviewed by someone who wasn't you
+- Reproducible builds; signed release binaries
+- `docs/SELF-HOSTING.md` — the one-binary path, and a TLS/reverse-proxy path
+- Accessibility pass: keyboard-complete, screen-reader-labelled, WCAG AA contrast
+- i18n, with नेपाली and हिन्दी as first-class rather than afterthoughts
+- Plugin authoring guide + template repository
+
+---
+
+## Explicitly out of scope for v1
+
+Written down so they don't creep in:
+
+- ❌ Mobile native apps (mobile browsers work; native comes much later if ever)
+- ❌ Server-side recording (client-side only)
+- ❌ SIP / phone dial-in (breaks E2EE by definition)
+- ❌ Cloud transcription (on-device Whisper WASM is the eventual answer)
+- ❌ User accounts, orgs, billing
+- ❌ SFU cascading / multi-region
+- ❌ Webinar mode, 100+ participants
+- ❌ Virtual backgrounds beyond blur + static image
+
+---
+
+## Sequencing risks
+
+| Risk | Mitigation |
+|---|---|
+| SFU takes far longer than hoped | Phase 1 already shipped; the project is alive regardless |
+| Cloudflare free tier exhausted by classroom use | ~25 hrs/month of 30-person calls, then $0.05/GB. Surface usage in-app before it surprises you |
+| Cloudflare changes terms or pricing | `PionTransport` (Phase 6) is the exit. Keep the `Transport` interface clean so it stays a real option, not a theoretical one |
+| E2EE + simulcast interact badly | Prototype the interaction during Phase 3, not after |
+| Plugin API proves inadequate | First-party features use only the public API — the gap surfaces early |
+| Effects tank performance on low-end devices | Frame budget enforced from the first plugin, not retrofitted |
+| Scope creep from "just one more feature" | The out-of-scope list above is a contract, not a suggestion |
