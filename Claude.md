@@ -71,5 +71,8 @@ Go is **not** needed for v1; it returns only for the optional self-hosted SFU.
 
 ## Current status
 
-Planning complete; no code yet. Next step is **Phase 0** — design system and clickable
-shell with fake participants, no WebRTC.
+Phases 1–2 shipped (real mesh calls, plugin system, on-device effects); Phases 3–6 exist as
+built, compiling foundations (the `Transport` interface, a self-hosted Go + Pion SFU in
+`selfhost/`, and MLS/OpenMLS→WASM + a frame encryptor in `crypto/`) not yet wired into live
+SFU calls. `docs/ROADMAP.md` is the source of truth for what's done — read it before
+assuming something is or isn't built.
