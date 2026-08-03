@@ -349,8 +349,11 @@ export default function App() {
               visible={chromeVisible}
               onShare={() => setShareOpen(true)}
               raisedHands={raisedHands}
-              // Mesh calls are genuinely E2EE — no middlebox exists to trust.
-              encryption={participantCount <= 4 ? 'mesh-e2ee' : 'sfu-e2ee'}
+              // Mesh is the only transport today, so every call is genuinely E2EE (P2P
+              // DTLS-SRTP — no middlebox in the media path). Do NOT report 'sfu-e2ee'
+              // until an SFU *and* Insertable-Streams/MLS frame encryption actually exist
+              // — the indicator states the real mode, never an aspiration (Claude.md §6).
+              encryption="mesh-e2ee"
             />
             <ControlBar
               muted={muted}
