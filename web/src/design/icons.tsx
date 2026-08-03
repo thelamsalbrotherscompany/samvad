@@ -23,6 +23,7 @@ import {
   MonitorUp,
   MoreHorizontal,
   PhoneOff,
+  Search,
   SendHorizontal,
   Settings,
   Smile,
@@ -50,6 +51,7 @@ export const UsersIcon = Users
 export const ChatIcon = MessageSquare
 export const SendIcon = SendHorizontal
 export const ReactIcon = Smile
+export const SearchIcon = Search
 export const HandIcon = Hand
 export const LeaveIcon = PhoneOff
 export const ShieldIcon = ShieldCheck

@@ -421,6 +421,7 @@ export default function App() {
             isHost={mesh.isHost}
             lobbyOpen={mesh.lobbyOpen}
             onSetLobbyOpen={mesh.setLobbyOpen}
+            onRemove={mesh.kick}
           />
         )}
 
