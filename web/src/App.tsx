@@ -25,6 +25,7 @@ import { getSessionId, getCreatedRoom, setCreatedRoom } from '@/core/room/sessio
 import { PluginHost, PluginStageOverlay } from '@/core/plugins/PluginHost'
 import reactionsPlugin from '@/plugins/reactions'
 import chatPlugin from '@/plugins/chat'
+import { useCallShortcuts } from '@/lib/useCallShortcuts'
 import { useIdle } from '@/lib/useIdle'
 import { useIsNarrow } from '@/lib/useMediaQuery'
 import { DEFAULT_SETTINGS, type Settings } from '@/lib/settings'
@@ -150,6 +151,15 @@ export default function App() {
     handRaised,
   })
   const phase = mesh.phase // 'connecting' | 'waiting' | 'admitted' | 'denied'
+
+  // Keyboard shortcuts: M mic, V camera, H hand, Space push-to-talk. Active in-call only.
+  useCallShortcuts({
+    enabled: joined && phase === 'admitted',
+    micOn: media.micOn,
+    setMicOn: media.setMicOn,
+    toggleCamera: () => media.setCameraOn(!media.cameraOn),
+    toggleHand: () => setHandRaised((v) => !v),
+  })
 
   const togglePin = (id: string) => setPinnedId((cur) => (cur === id ? null : id))
   // Drop the pin if that person has left, so the stage doesn't feature a ghost.

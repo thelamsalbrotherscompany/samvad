@@ -68,6 +68,13 @@ const BACKGROUNDS: { value: Background; label: string }[] = [
   { value: 'strong-blur', label: 'Strong blur' },
 ]
 
+const SHORTCUTS: [keys: string[], desc: string][] = [
+  [['M'], 'Toggle microphone'],
+  [['V'], 'Toggle camera'],
+  [['H'], 'Raise / lower hand'],
+  [['Space'], 'Push to talk (hold)'],
+]
+
 /** Read a picked image file into a data URL, kept entirely in memory on this device. */
 function readImageFile(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -324,6 +331,26 @@ export function SettingsDialog({
                   onCheckedChange={(v) => onChange({ noiseSuppression: v })}
                 />
               </Row>
+            </Section>
+
+            <Section title="Keyboard shortcuts">
+              <dl className="space-y-2 text-[13px]">
+                {SHORTCUTS.map(([keys, desc]) => (
+                  <div key={desc} className="flex items-center justify-between gap-4">
+                    <dt className="text-ink-muted">{desc}</dt>
+                    <dd className="flex shrink-0 gap-1">
+                      {keys.map((k) => (
+                        <kbd
+                          key={k}
+                          className="rounded-md border border-line bg-surface-2 px-2 py-0.5 font-mono text-[12px] text-ink"
+                        >
+                          {k}
+                        </kbd>
+                      ))}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             </Section>
           </div>
 
