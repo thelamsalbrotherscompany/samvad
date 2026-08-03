@@ -133,12 +133,17 @@ Phase 1 — that unchanged UI is the proof the abstraction was correct.
 
 ## Phase 4 — End-to-end encryption over the SFU
 
-- Insertable Streams (`RTCRtpScriptTransform`) frame encryption
-- **MLS (RFC 9420) via OpenMLS**, Rust → WASM, following the Orange Meets design.
-  Gives real forward secrecy and clean removal of departed participants
-- ⚠️ Leave the first 1–10 VP8 header bytes unencrypted or browsers fail depacketization.
-  Budget for this rather than rediscovering it
-- Key rotation on join and leave
+- ✅ **MLS (RFC 9420) via OpenMLS, Rust → WASM** (`crypto/mls/`): a thin wrapper around
+  audited OpenMLS 0.8 (MIT), compiled to `wasm32` — full group API (create / add → commit
+  + welcome / join / process / remove / export epoch secret). Forward secrecy + post-
+  compromise security + cryptographic membership. Built module vendored to
+  `web/src/core/crypto/mls/`; loads on demand. Samvad writes no crypto of its own
+- ✅ **Insertable-Streams frame encryption** (`web/src/core/crypto/frameCrypto.ts`): per-frame
+  AES-GCM keyed by the MLS epoch secret (HKDF), epoch-tagged for in-flight **key rotation**,
+  installs via `RTCRtpScriptTransform`/`createEncodedStreams`. ⚠️ Leaves the codec header
+  bytes clear (10 key / 3 delta video, 1 audio) so browsers still depacketize
+- ⏳ Wiring it live: ferry MLS handshakes over the data channel, sync MLS membership to the
+  lobby, and turn it on for the SFU path (the mesh is already E2EE, so it needs it only there)
 - Honest, always-visible encryption indicator: mesh-E2EE / SFU-E2EE / hop-by-hop
 - Documented, tested fallback for browsers lacking Insertable Streams
 

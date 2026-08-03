@@ -1,0 +1,27 @@
+[package]
+name = "samvad-mls"
+version = "0.1.0"
+edition = "2021"
+description = "MLS (RFC 9420) group key management for Samvad's end-to-end encryption, compiled to WASM."
+license = "AGPL-3.0-or-later"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+# `js` feature: use the browser's crypto.getRandomValues + timer under wasm.
+openmls = { version = "0.8", features = ["js"] }
+openmls_rust_crypto = "0.5"
+openmls_basic_credential = "0.5"
+openmls_traits = "0.5"
+tls_codec = "0.4"
+# Enable the browser RNG backend for the transitive getrandom in the crypto stack.
+getrandom = { version = "0.2", features = ["js"] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true
+# Absolute source paths (dependency panic locations, etc.) are stripped from the binary via
+# --remap-path-prefix in build.sh — so the committed .wasm never embeds a machine path.

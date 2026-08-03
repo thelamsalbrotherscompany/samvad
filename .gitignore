@@ -10,3 +10,6 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+
+# Rust build output
+target/
