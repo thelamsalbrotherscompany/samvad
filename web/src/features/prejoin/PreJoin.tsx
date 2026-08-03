@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Button, ControlButton, Hint } from '@/design/primitives'
 import {
+  HeadphonesIcon,
   MaximizeIcon,
   MicIcon,
   MicOffIcon,
@@ -231,6 +232,14 @@ export function PreJoin({
               no database — this room stops existing the moment everyone leaves.
             </p>
           </div>
+
+          {/* Echo happens when a speaker's sound reaches a mic. Headphones break that loop. */}
+          {hasMic && (
+            <p className="mt-3 flex items-center gap-2 px-1 text-[12px] text-ink-faint">
+              <HeadphonesIcon className="size-4 shrink-0" />
+              Headphones are best — they stop others from hearing an echo of themselves.
+            </p>
+          )}
         </div>
       </div>
 

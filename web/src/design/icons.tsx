@@ -13,6 +13,7 @@ import {
   Copy,
   EyeOff,
   Hand,
+  Headphones,
   LayoutGrid,
   Lock,
   Maximize2,
@@ -23,6 +24,7 @@ import {
   MonitorUp,
   MoreHorizontal,
   PhoneOff,
+  Pin,
   Search,
   SendHorizontal,
   Settings,
@@ -52,7 +54,9 @@ export const ChatIcon = MessageSquare
 export const SendIcon = SendHorizontal
 export const ReactIcon = Smile
 export const SearchIcon = Search
+export const PinIcon = Pin
 export const HandIcon = Hand
+export const HeadphonesIcon = Headphones
 export const LeaveIcon = PhoneOff
 export const ShieldIcon = ShieldCheck
 export const SettingsIcon = Settings

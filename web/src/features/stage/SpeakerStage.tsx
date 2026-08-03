@@ -2,6 +2,7 @@ import type { Participant } from '@/core/participants'
 import { cn } from '@/lib/cn'
 import { ParticipantTile } from './ParticipantTile'
 import { ScreenShareTile } from './ScreenShareTile'
+import { useTileActions } from './tileActions'
 
 export type ScreenShare = { presenterName: string; stream: MediaStream | null }
 
@@ -30,6 +31,7 @@ export function SpeakerStage({
   /** Controls are on screen — reserve room below the filmstrip so they don't cover it. */
   controlsVisible?: boolean
 }) {
+  const { pinnedId } = useTileActions()
   const self = participants.find((p) => p.isSelf)
   const others = participants.filter((p) => !p.isSelf)
 
@@ -52,8 +54,13 @@ export function SpeakerStage({
     )
   }
 
+  // A pinned person holds the feature; otherwise it follows the active speaker.
   const featured =
-    others.find((p) => p.id === activeSpeakerId) ?? others[0] ?? self ?? participants[0]
+    (pinnedId ? others.find((p) => p.id === pinnedId) : undefined) ??
+    others.find((p) => p.id === activeSpeakerId) ??
+    others[0] ??
+    self ??
+    participants[0]
   const rail = handsFirst(others.filter((p) => p.id !== featured.id))
 
   return (

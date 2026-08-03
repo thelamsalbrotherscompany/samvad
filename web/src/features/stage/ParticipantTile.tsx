@@ -1,4 +1,4 @@
-import { MicOffIcon, HandIcon, RemoveUserIcon } from '@/design/icons'
+import { MicOffIcon, HandIcon, PinIcon, RemoveUserIcon } from '@/design/icons'
 import { Hint } from '@/design/primitives'
 import { TILE_WASHES, initialsOf, type Participant } from '@/core/participants'
 import { VideoView } from '@/core/media/VideoView'
@@ -22,8 +22,11 @@ export function ParticipantTile({ participant, compact = false }: Props) {
     participant
   const initials = initialsOf(name)
   const showVideo = !cameraOff && !!stream && stream.getVideoTracks().length > 0
-  const { canManage, onRemove } = useTileActions()
+  const { canManage, onRemove, pinnedId, onTogglePin } = useTileActions()
   const removable = canManage && !isSelf
+  // Pinning is a personal view choice, offered on anyone but yourself.
+  const pinnable = !isSelf && !compact
+  const pinned = pinnedId === participant.id
 
   return (
     <div
@@ -115,6 +118,25 @@ export function ParticipantTile({ participant, compact = false }: Props) {
           <HandIcon className="size-4.5" />
           <span className="sr-only">{name} raised their hand</span>
         </div>
+      )}
+
+      {/* Pin this person to the featured slot — a local view choice. Shows on hover, and
+          stays lit while pinned so it's easy to unpin. */}
+      {pinnable && (
+        <Hint label={pinned ? 'Unpin' : 'Pin to screen'}>
+          <button
+            aria-label={pinned ? `Unpin ${name}` : `Pin ${name} to the screen`}
+            onClick={() => onTogglePin(participant.id)}
+            className={cn(
+              'absolute right-2.5 bottom-2.5 grid size-7 place-items-center rounded-full backdrop-blur-md transition-all duration-150',
+              pinned
+                ? 'bg-accent text-base opacity-100'
+                : 'bg-black/50 text-white opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-black/70',
+            )}
+          >
+            <PinIcon className="size-3.5" />
+          </button>
+        </Hint>
       )}
 
       {/* Host: remove this person, straight from their tile. Hover to reveal (touch: the

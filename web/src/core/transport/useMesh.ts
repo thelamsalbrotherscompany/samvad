@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   MeshTransport,
+  type ActivityEvent,
   type ChatMessage,
   type Phase,
   type Reaction,
@@ -34,6 +35,7 @@ export type Mesh = {
   knocks: PeerInfo[]
   messages: ChatMessage[]
   reactions: Reaction[]
+  activity: ActivityEvent[]
   admit: (id: string) => void
   deny: (id: string) => void
   setLobbyOpen: (open: boolean) => void
@@ -57,6 +59,7 @@ export function useMesh(opts: Options): Mesh {
   const [lobbyOpen, setLobbyOpenState] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [reactions, setReactions] = useState<Reaction[]>([])
+  const [activity, setActivity] = useState<ActivityEvent[]>([])
   const ref = useRef<MeshTransport | null>(null)
 
   useEffect(() => {
@@ -88,6 +91,7 @@ export function useMesh(opts: Options): Mesh {
           // Transient — drop it once it has risen and faded (matches the tile animation).
           setTimeout(() => setReactions((prev) => prev.filter((x) => x.id !== r.id)), 2800)
         },
+        onActivity: (e) => setActivity((prev) => [...prev, e]),
       },
     )
     transport.connect()
@@ -100,6 +104,7 @@ export function useMesh(opts: Options): Mesh {
       setKnocks([])
       setMessages([])
       setReactions([])
+      setActivity([])
       setConnected(false)
       setPhase('connecting')
       setIsHost(false)
@@ -146,6 +151,7 @@ export function useMesh(opts: Options): Mesh {
     knocks,
     messages,
     reactions,
+    activity,
     admit,
     deny,
     setLobbyOpen,

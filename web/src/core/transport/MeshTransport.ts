@@ -48,6 +48,14 @@ export type Reaction = {
   self: boolean
 }
 
+/** A join/left event, so the host can see who came and went mid-call. In-memory only. */
+export type ActivityEvent = {
+  id: string
+  kind: 'joined' | 'left'
+  name: string
+  ts: number
+}
+
 /** Where you are relative to the room's lobby. */
 export type Phase =
   | 'connecting'
@@ -72,6 +80,7 @@ type Handlers = {
   onLobbyOpen: (open: boolean) => void
   onChat: (msg: ChatMessage) => void
   onReaction: (r: Reaction) => void
+  onActivity: (e: ActivityEvent) => void
 }
 
 export class MeshTransport {
@@ -435,11 +444,16 @@ export class MeshTransport {
         // presenting, open a screen connection out to the newcomer.
         this.addPeer(msg.peer)
         this.ensureOutScreen(msg.peer.id)
+        this.logActivity('joined', msg.peer.name)
         break
 
-      case 'peer-left':
+      case 'peer-left': {
+        // Capture the name before we forget them.
+        const name = this.peers.get(msg.id)?.name
         this.dropPeer(msg.id)
+        if (name) this.logActivity('left', name)
         break
+      }
 
       case 'peer-state': {
         const wasSharing = this.peers.get(msg.peer.id)?.sharing ?? false
@@ -712,6 +726,11 @@ export class MeshTransport {
   private emitKnocks(): void {
     if (this.closed) return
     this.handlers.onKnocks([...this.knocks.values()])
+  }
+
+  private logActivity(kind: 'joined' | 'left', name: string): void {
+    if (this.closed) return
+    this.handlers.onActivity({ id: crypto.randomUUID(), kind, name, ts: Date.now() })
   }
 
   private sendToServer(msg: ClientMessage): void {

@@ -110,6 +110,8 @@ export default function App() {
   const [chatOpen, setChatOpen] = useState(false)
   const [chatSeen, setChatSeen] = useState(0)
   const [locked, setLocked] = useState(false)
+  // A remote participant pinned to the featured slot — a local view choice.
+  const [pinnedId, setPinnedId] = useState<string | null>(null)
 
   const patchSettings = (patch: Partial<Settings>) =>
     setSettings((s) => ({ ...s, ...patch }))
@@ -153,6 +155,12 @@ export default function App() {
     if (!joined) setChatSeen(0)
   }, [joined])
   const chatUnread = Math.max(0, mesh.messages.length - chatSeen)
+
+  const togglePin = (id: string) => setPinnedId((cur) => (cur === id ? null : id))
+  // Drop the pin if that person has left, so the stage doesn't feature a ghost.
+  useEffect(() => {
+    if (pinnedId && !mesh.peers.some((p) => p.id === pinnedId)) setPinnedId(null)
+  }, [pinnedId, mesh.peers])
 
   // You, real.
   const selfParticipant: Participant = {
@@ -233,7 +241,7 @@ export default function App() {
 
   // The layout actually on screen. The toggle flips this, so pressing it always
   // changes what the user sees — never a hidden preference that already matched.
-  const layout = resolveStageView(view, narrow, participantCount, screenShare)
+  const layout = resolveStageView(view, narrow, participantCount, screenShare, pinnedId != null)
 
   return (
     <TooltipProvider>
@@ -285,7 +293,12 @@ export default function App() {
         ) : (
           <>
             <TileActionsContext.Provider
-              value={{ canManage: mesh.isHost, onRemove: mesh.kick }}
+              value={{
+                canManage: mesh.isHost,
+                onRemove: mesh.kick,
+                pinnedId,
+                onTogglePin: togglePin,
+              }}
             >
               {alone ? (
                 <WaitingRoom
@@ -304,6 +317,7 @@ export default function App() {
                   activeSpeakerId={speakingId}
                   view={view}
                   screenShare={screenShare}
+                  pinnedId={pinnedId}
                   controlsVisible={chromeVisible}
                 />
               )}
@@ -418,6 +432,7 @@ export default function App() {
             open={participantsOpen}
             onOpenChange={setParticipantsOpen}
             participants={[selfParticipant, ...remoteParticipants]}
+            activity={mesh.activity}
             isHost={mesh.isHost}
             lobbyOpen={mesh.lobbyOpen}
             onSetLobbyOpen={mesh.setLobbyOpen}

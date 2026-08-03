@@ -11,6 +11,8 @@ type Props = {
   activeSpeakerId: string | null
   view: StageView
   screenShare?: ScreenShare | null
+  /** A remote participant pinned to the featured slot — forces speaker view. */
+  pinnedId?: string | null
   /** Whether the floating controls are on screen (affects mobile filmstrip spacing). */
   controlsVisible?: boolean
 }
@@ -26,10 +28,11 @@ export function Stage({
   activeSpeakerId,
   view,
   screenShare,
+  pinnedId,
   controlsVisible = true,
 }: Props) {
   const narrow = useIsNarrow()
-  const effective = resolveStageView(view, narrow, participants.length, screenShare)
+  const effective = resolveStageView(view, narrow, participants.length, screenShare, !!pinnedId)
 
   return effective === 'speaker' ? (
     <SpeakerStage
@@ -53,9 +56,10 @@ export function resolveStageView(
   narrow: boolean,
   count: number,
   screenShare?: ScreenShare | null,
+  pinned?: boolean,
 ): 'grid' | 'speaker' {
-  // A shared screen takes precedence over everything.
-  if (screenShare) return 'speaker'
+  // A shared screen — or a pinned person — takes precedence: both mean "feature one thing".
+  if (screenShare || pinned) return 'speaker'
   if (view !== 'auto') return view
   if (narrow) return 'speaker'
   // From three people up, attention beats coverage: feature the speaker, rail the
