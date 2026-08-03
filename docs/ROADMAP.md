@@ -164,6 +164,12 @@ logs demonstrably cannot reconstruct a frame.
 - **`PionTransport`** — a self-hosted Go + Pion SFU in `selfhost/`, for anyone who declines
   to trust Cloudflare. This is what keeps the project from being vendor-captured, and it's
   the honest answer to THREAT-MODEL §4
+  - ✅ **SFU server built** (`selfhost/`, Go + Pion): per-room track fan-out (publish once,
+    forward to all), server-sole-offer signalling (no glare), keyframe requests, clean
+    teardown. Compiles, `go vet`s, boots and serves; a bare test client (`web/index.html`)
+    verifies it in two browser tabs. Forwards RTP only — never transcodes, and blind to
+    E2EE media. ⏳ Still to do: the browser `PionTransport` (client `Transport` impl reusing
+    the app's lobby/presence signalling), screen-share as a 2nd track, and simulcast
 - Published threat model, reviewed by someone who wasn't you
 - Reproducible builds; signed release binaries
 - `docs/SELF-HOSTING.md` — the one-binary path, and a TLS/reverse-proxy path

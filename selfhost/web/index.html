@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Samvad SFU — test client</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #14110f;
+        color: #eee;
+      }
+      header {
+        padding: 12px 16px;
+        border-bottom: 1px solid #333;
+        font-size: 14px;
+      }
+      #grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 8px;
+        padding: 12px;
+      }
+      video {
+        width: 100%;
+        aspect-ratio: 16/9;
+        object-fit: cover;
+        background: #000;
+        border-radius: 8px;
+      }
+      .tag {
+        color: #e8a33d;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      Samvad self-hosted SFU — bare test client (not the app UI). Room:
+      <span class="tag" id="room"></span> · <span id="status">connecting…</span>. Open this
+      page in two tabs (or on two devices) with the same <code>?room=</code>.
+    </header>
+    <div id="grid">
+      <video id="local" autoplay playsinline muted></video>
+    </div>
+
+    <script>
+      const room = new URLSearchParams(location.search).get('room') || 'demo'
+      document.getElementById('room').textContent = room
+      const status = document.getElementById('status')
+      const grid = document.getElementById('grid')
+
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.cloudflare.com:3478' }],
+      })
+
+      // Render each remote stream as its own tile.
+      const remotes = new Map()
+      pc.ontrack = (e) => {
+        const stream = e.streams[0]
+        if (!stream || remotes.has(stream.id)) return
+        remotes.set(stream.id, stream)
+        const v = document.createElement('video')
+        v.autoplay = true
+        v.playsInline = true
+        v.srcObject = stream
+        grid.appendChild(v)
+        stream.addEventListener('removetrack', () => {
+          if (stream.getTracks().length === 0) {
+            v.remove()
+            remotes.delete(stream.id)
+          }
+        })
+      }
+
+      let ws
+      pc.onicecandidate = (e) => {
+        if (e.candidate) {
+          ws?.send(JSON.stringify({ event: 'candidate', data: JSON.stringify(e.candidate) }))
+        }
+      }
+
+      function openSocket() {
+        const scheme = location.protocol === 'https:' ? 'wss' : 'ws'
+        ws = new WebSocket(`${scheme}://${location.host}/sfu?room=${encodeURIComponent(room)}`)
+        ws.onopen = () => (status.textContent = 'connected')
+        ws.onclose = () => (status.textContent = 'disconnected')
+        ws.onmessage = async (evt) => {
+          const msg = JSON.parse(evt.data)
+          if (msg.event === 'offer') {
+            // The SFU is the sole offerer; we only ever answer.
+            await pc.setRemoteDescription(JSON.parse(msg.data))
+            const answer = await pc.createAnswer()
+            await pc.setLocalDescription(answer)
+            ws.send(JSON.stringify({ event: 'answer', data: JSON.stringify(answer) }))
+          } else if (msg.event === 'candidate') {
+            try {
+              await pc.addIceCandidate(JSON.parse(msg.data))
+            } catch {
+              /* candidate before remote description — harmless */
+            }
+          }
+        }
+      }
+
+      // Publish local media first, then connect — so the SFU's first offer already carries
+      // our tracks and we start sending immediately.
+      navigator.mediaDevices
+        .getUserMedia({ video: true, audio: true })
+        .then((stream) => {
+          document.getElementById('local').srcObject = stream
+          for (const track of stream.getTracks()) pc.addTrack(track, stream)
+          openSocket()
+        })
+        .catch((err) => {
+          status.textContent = 'camera/mic error: ' + err.message
+          openSocket()
+        })
+    </script>
+  </body>
+</html>
