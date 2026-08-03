@@ -1,14 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  MeshTransport,
-  type ActivityEvent,
-  type Phase,
-  type RemotePeer,
-} from './MeshTransport'
+import { MeshTransport } from './MeshTransport'
+import type { ActivityEvent, Phase, RemotePeer, Transport } from './Transport'
+import type { PeerInfo } from './protocol'
 
 /** A handler for messages arriving on a plugin data topic. */
 export type DataHandler = (payload: unknown, from: string) => void
-import type { PeerInfo } from './protocol'
 
 type Options = {
   /** Connect when true (i.e. the user has joined the call). */
@@ -59,7 +55,9 @@ export function useMesh(opts: Options): Mesh {
   const [isHost, setIsHost] = useState(false)
   const [lobbyOpen, setLobbyOpenState] = useState(false)
   const [activity, setActivity] = useState<ActivityEvent[]>([])
-  const ref = useRef<MeshTransport | null>(null)
+  // Typed to the interface, not the concrete class: the app is transport-agnostic, so a
+  // future RealtimeTransport / PionTransport drops in here with no UI changes.
+  const ref = useRef<Transport | null>(null)
   // Plugin topic subscribers, kept in a ref so the transport's onData handler (set once at
   // construction) always dispatches to the current set.
   const subscribersRef = useRef(new Map<string, Set<DataHandler>>())

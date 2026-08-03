@@ -4,6 +4,9 @@ import type {
   ServerMessage,
   SignalKind,
 } from './protocol'
+import type { RemotePeer, Transport, TransportHandlers } from './Transport'
+
+export type { RemotePeer, Phase, ActivityEvent } from './Transport'
 
 /**
  * P2P mesh transport. Every participant holds a direct RTCPeerConnection to every
@@ -14,51 +17,16 @@ import type {
  * one-directional: a NEWCOMER offers to everyone already in the room; existing peers
  * only ever answer.
  *
- * Correct up to ~4–5 people (each client uploads N−1 copies of itself); the SfuTransport
- * takes over beyond that, behind this same shape.
+ * Correct up to ~4–5 people (each client uploads N−1 copies of itself); the SFU transports
+ * take over beyond that, behind this same {@link Transport} shape.
  */
-
-export type RemotePeer = PeerInfo & {
-  stream: MediaStream | null
-  /** This peer's shared screen, on a connection of its own. Null until it's flowing. */
-  screenStream: MediaStream | null
-}
-
-/** A join/left event, so the host can see who came and went mid-call. In-memory only. */
-export type ActivityEvent = {
-  id: string
-  kind: 'joined' | 'left'
-  name: string
-  ts: number
-}
-
-/** Where you are relative to the room's lobby. */
-export type Phase =
-  | 'connecting'
-  | 'waiting'
-  | 'admitted'
-  | 'denied'
-  | 'removed'
-  | 'ended'
-  | 'not-found'
 
 // Fallback until the worker's /ice list loads (or if it can't be reached). The worker
 // adds Cloudflare Realtime TURN on top of this when credentials are configured, for the
 // ~15% of networks that can't connect directly. stun.cloudflare.com is free and unlimited.
 const STUN_FALLBACK: RTCIceServer[] = [{ urls: 'stun:stun.cloudflare.com:3478' }]
 
-type Handlers = {
-  onPeers: (peers: RemotePeer[]) => void
-  onConnected: (connected: boolean) => void
-  onPhase: (phase: Phase) => void
-  onHost: (isHost: boolean) => void
-  onKnocks: (knocks: PeerInfo[]) => void
-  onLobbyOpen: (open: boolean) => void
-  onData: (topic: string, from: string, payload: unknown) => void
-  onActivity: (e: ActivityEvent) => void
-}
-
-export class MeshTransport {
+export class MeshTransport implements Transport {
   private ws: WebSocket | null = null
   private readonly pcs = new Map<string, RTCPeerConnection>()
   // Screen share rides on its own PCs so it never renegotiates the camera/mic link.
@@ -71,7 +39,7 @@ export class MeshTransport {
   private readonly peers = new Map<string, RemotePeer>()
   private readonly knocks = new Map<string, PeerInfo>()
   private readonly roomName: string
-  private readonly handlers: Handlers
+  private readonly handlers: TransportHandlers
   /** True only for "New meeting" — permits bringing an empty room into existence. */
   private readonly create: boolean
   /** Per-tab id used to reclaim our spot after a drop/refresh (see RoomDO grace). */
@@ -97,7 +65,7 @@ export class MeshTransport {
     localStream: MediaStream | null,
     create: boolean,
     session: string,
-    handlers: Handlers,
+    handlers: TransportHandlers,
   ) {
     this.roomName = roomName
     this.identity = identity
