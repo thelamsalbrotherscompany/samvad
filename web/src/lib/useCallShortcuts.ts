@@ -7,6 +7,7 @@ type Options = {
   setMicOn: (on: boolean) => void
   toggleCamera: () => void
   toggleHand: () => void
+  toggleFullscreen: () => void
 }
 
 /**
@@ -67,6 +68,10 @@ export function useCallShortcuts(opts: Options): void {
         case 'h':
           e.preventDefault()
           o.toggleHand()
+          break
+        case 'f':
+          e.preventDefault()
+          o.toggleFullscreen()
           break
       }
     }

@@ -26,6 +26,7 @@ import { PluginHost, PluginStageOverlay } from '@/core/plugins/PluginHost'
 import reactionsPlugin from '@/plugins/reactions'
 import chatPlugin from '@/plugins/chat'
 import { useCallShortcuts } from '@/lib/useCallShortcuts'
+import { useFullscreen } from '@/lib/useFullscreen'
 import { useIdle } from '@/lib/useIdle'
 import { useIsNarrow } from '@/lib/useMediaQuery'
 import { DEFAULT_SETTINGS, type Settings } from '@/lib/settings'
@@ -152,13 +153,16 @@ export default function App() {
   })
   const phase = mesh.phase // 'connecting' | 'waiting' | 'admitted' | 'denied'
 
-  // Keyboard shortcuts: M mic, V camera, H hand, Space push-to-talk. Active in-call only.
+  const fullscreen = useFullscreen()
+
+  // Keyboard shortcuts: M mic, V camera, H hand, F fullscreen, Space push-to-talk.
   useCallShortcuts({
     enabled: joined && phase === 'admitted',
     micOn: media.micOn,
     setMicOn: media.setMicOn,
     toggleCamera: () => media.setCameraOn(!media.cameraOn),
     toggleHand: () => setHandRaised((v) => !v),
+    toggleFullscreen: fullscreen.toggle,
   })
 
   const togglePin = (id: string) => setPinnedId((cur) => (cur === id ? null : id))
@@ -364,6 +368,8 @@ export default function App() {
               onToggleHand={() => setHandRaised((v) => !v)}
               onToggleShare={() => void toggleShare()}
               onToggleView={() => setView(layout === 'speaker' ? 'grid' : 'speaker')}
+              isFullscreen={fullscreen.isFullscreen}
+              onToggleFullscreen={fullscreen.toggle}
               onOpenSettings={() => setSettingsOpen(true)}
               onOpenParticipants={() => setParticipantsOpen(true)}
               onLockView={() => setLocked(true)}

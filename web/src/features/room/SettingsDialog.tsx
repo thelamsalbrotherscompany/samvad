@@ -72,6 +72,7 @@ const SHORTCUTS: [keys: string[], desc: string][] = [
   [['M'], 'Toggle microphone'],
   [['V'], 'Toggle camera'],
   [['H'], 'Raise / lower hand'],
+  [['F'], 'Full screen'],
   [['Space'], 'Push to talk (hold)'],
 ]
 

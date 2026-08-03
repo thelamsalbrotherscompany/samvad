@@ -6,6 +6,8 @@ import {
   HandIcon,
   LeaveIcon,
   LockIcon,
+  MaximizeIcon,
+  MinimizeIcon,
   MicIcon,
   MicOffIcon,
   MoreIcon,
@@ -34,6 +36,8 @@ type Props = {
   isHost: boolean
   /** The layout currently on screen — the button flips this. */
   layout: 'grid' | 'speaker'
+  isFullscreen: boolean
+  onToggleFullscreen: () => void
   onToggleMute: () => void
   onToggleSpeaker: () => void
   onToggleCamera: () => void
@@ -57,6 +61,8 @@ export function ControlBar({
   alone,
   isHost,
   layout,
+  isFullscreen,
+  onToggleFullscreen,
   onToggleMute,
   onToggleSpeaker,
   onToggleCamera,
@@ -99,6 +105,11 @@ export function ControlBar({
       soloHidden: true,
     },
     { label: 'Participants', icon: <UsersIcon />, onClick: onOpenParticipants },
+    {
+      label: isFullscreen ? 'Exit full screen' : 'Full screen',
+      icon: isFullscreen ? <MinimizeIcon /> : <MaximizeIcon />,
+      onClick: onToggleFullscreen,
+    },
     {
       label: 'Hide controls',
       icon: <LockIcon />,
