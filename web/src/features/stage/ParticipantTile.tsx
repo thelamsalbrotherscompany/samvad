@@ -18,7 +18,7 @@ type Props = {
  * so one component looks right from a 96px thumbnail to a full-screen speaker.
  */
 export function ParticipantTile({ participant, compact = false }: Props) {
-  const { name, isSelf, muted, cameraOff, speaking, handRaised, wash, stream, mirrored } =
+  const { name, isSelf, muted, cameraOff, speaking, handRaised, wash, stream, mirrored, reaction } =
     participant
   const initials = initialsOf(name)
   const showVideo = !cameraOff && !!stream && stream.getVideoTracks().length > 0
@@ -68,6 +68,24 @@ export function ParticipantTile({ participant, compact = false }: Props) {
             style={{ fontSize: 'min(34cqmin, 140px)' }}
           >
             {initials}
+          </span>
+        </div>
+      )}
+
+      {/* A live emoji reaction: springs in near the bottom, drifts up inside the tile,
+          then dissolves. The wrapper centers it (no transform) so the inner span is free
+          to animate translateY; keyed by id so each new one replays — even the same emoji. */}
+      {reaction && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-10 z-10 flex justify-center">
+          <span
+            key={reaction.id}
+            className="drop-shadow-lg"
+            style={{
+              fontSize: 'min(20cqmin, 52px)',
+              animation: 'samvad-react 2.6s var(--ease-settle) both',
+            }}
+          >
+            {reaction.emoji}
           </span>
         </div>
       )}

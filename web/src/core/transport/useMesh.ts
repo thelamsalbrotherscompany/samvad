@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MeshTransport, type ChatMessage, type Phase, type RemotePeer } from './MeshTransport'
+import {
+  MeshTransport,
+  type ChatMessage,
+  type Phase,
+  type Reaction,
+  type RemotePeer,
+} from './MeshTransport'
 import type { PeerInfo } from './protocol'
 
 type Options = {
@@ -27,12 +33,14 @@ export type Mesh = {
   peers: RemotePeer[]
   knocks: PeerInfo[]
   messages: ChatMessage[]
+  reactions: Reaction[]
   admit: (id: string) => void
   deny: (id: string) => void
   setLobbyOpen: (open: boolean) => void
   kick: (id: string) => void
   end: () => void
   sendChat: (text: string) => void
+  sendReaction: (emoji: string) => void
 }
 
 /**
@@ -48,6 +56,7 @@ export function useMesh(opts: Options): Mesh {
   const [isHost, setIsHost] = useState(false)
   const [lobbyOpen, setLobbyOpenState] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [reactions, setReactions] = useState<Reaction[]>([])
   const ref = useRef<MeshTransport | null>(null)
 
   useEffect(() => {
@@ -74,6 +83,11 @@ export function useMesh(opts: Options): Mesh {
         onKnocks: setKnocks,
         onLobbyOpen: setLobbyOpenState,
         onChat: (m) => setMessages((prev) => [...prev, m]),
+        onReaction: (r) => {
+          setReactions((prev) => [...prev, r])
+          // Transient — drop it once it has risen and faded (matches the tile animation).
+          setTimeout(() => setReactions((prev) => prev.filter((x) => x.id !== r.id)), 2800)
+        },
       },
     )
     transport.connect()
@@ -85,6 +99,7 @@ export function useMesh(opts: Options): Mesh {
       setPeers([])
       setKnocks([])
       setMessages([])
+      setReactions([])
       setConnected(false)
       setPhase('connecting')
       setIsHost(false)
@@ -120,6 +135,7 @@ export function useMesh(opts: Options): Mesh {
   const kick = useCallback((id: string) => ref.current?.kick(id), [])
   const end = useCallback(() => ref.current?.end(), [])
   const sendChat = useCallback((text: string) => ref.current?.sendChat(text), [])
+  const sendReaction = useCallback((emoji: string) => ref.current?.sendReaction(emoji), [])
 
   return {
     connected,
@@ -129,11 +145,13 @@ export function useMesh(opts: Options): Mesh {
     peers,
     knocks,
     messages,
+    reactions,
     admit,
     deny,
     setLobbyOpen,
     kick,
     end,
     sendChat,
+    sendReaction,
   }
 }

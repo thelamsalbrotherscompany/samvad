@@ -39,6 +39,15 @@ export type ChatMessage = {
   self: boolean
 }
 
+/** A transient emoji reaction — floats up and vanishes, never stored. Same E2EE path. */
+export type Reaction = {
+  id: string
+  senderId: string
+  senderName: string
+  emoji: string
+  self: boolean
+}
+
 /** Where you are relative to the room's lobby. */
 export type Phase =
   | 'connecting'
@@ -62,6 +71,7 @@ type Handlers = {
   onKnocks: (knocks: PeerInfo[]) => void
   onLobbyOpen: (open: boolean) => void
   onChat: (msg: ChatMessage) => void
+  onReaction: (r: Reaction) => void
 }
 
 export class MeshTransport {
@@ -250,16 +260,7 @@ export class MeshTransport {
     const body = text.trim()
     if (!body) return
     const ts = Date.now()
-    const payload = JSON.stringify({ name: this.identity.name, text: body, ts })
-    for (const ch of this.chatChannels.values()) {
-      if (ch.readyState === 'open') {
-        try {
-          ch.send(payload)
-        } catch {
-          // Channel mid-close — skip it.
-        }
-      }
-    }
+    this.broadcastData(JSON.stringify({ t: 'chat', name: this.identity.name, text: body, ts }))
     // Our own message shows immediately; it's never echoed back over the wire.
     this.handlers.onChat({
       id: crypto.randomUUID(),
@@ -271,24 +272,62 @@ export class MeshTransport {
     })
   }
 
-  private onChatData(peerId: string, raw: string): void {
-    let data: { name?: unknown; text?: unknown; ts?: unknown }
+  /** Broadcast a transient emoji reaction to every connected peer. */
+  sendReaction(emoji: string): void {
+    if (!emoji) return
+    this.broadcastData(JSON.stringify({ t: 'reaction', name: this.identity.name, emoji }))
+    this.handlers.onReaction({
+      id: crypto.randomUUID(),
+      senderId: this.selfId,
+      senderName: this.identity.name,
+      emoji,
+      self: true,
+    })
+  }
+
+  private broadcastData(payload: string): void {
+    for (const ch of this.chatChannels.values()) {
+      if (ch.readyState === 'open') {
+        try {
+          ch.send(payload)
+        } catch {
+          // Channel mid-close — skip it.
+        }
+      }
+    }
+  }
+
+  private onDataMessage(peerId: string, raw: string): void {
+    let data: { t?: unknown; name?: unknown; text?: unknown; emoji?: unknown; ts?: unknown }
     try {
       data = JSON.parse(raw) as typeof data
     } catch {
       return
     }
-    if (typeof data.text !== 'string' || !data.text) return
     const peer = this.peers.get(peerId)
-    this.handlers.onChat({
-      id: crypto.randomUUID(),
-      senderId: peerId,
-      senderName:
-        typeof data.name === 'string' && data.name ? data.name : peer?.name || 'Guest',
-      text: data.text,
-      ts: typeof data.ts === 'number' ? data.ts : Date.now(),
-      self: false,
-    })
+    const senderName =
+      typeof data.name === 'string' && data.name ? data.name : peer?.name || 'Guest'
+
+    if (data.t === 'reaction' && typeof data.emoji === 'string' && data.emoji) {
+      this.handlers.onReaction({
+        id: crypto.randomUUID(),
+        senderId: peerId,
+        senderName,
+        emoji: data.emoji,
+        self: false,
+      })
+      return
+    }
+    if (typeof data.text === 'string' && data.text) {
+      this.handlers.onChat({
+        id: crypto.randomUUID(),
+        senderId: peerId,
+        senderName,
+        text: data.text,
+        ts: typeof data.ts === 'number' ? data.ts : Date.now(),
+        self: false,
+      })
+    }
   }
 
   /** Push a presence change (mute / camera / hand) to the room. */
@@ -456,7 +495,7 @@ export class MeshTransport {
     // Negotiated data channel for chat: both sides create the same id, so it needs no
     // offer/answer of its own and opens as soon as the connection is up.
     const chat = pc.createDataChannel('samvad-chat', { negotiated: true, id: 0 })
-    chat.onmessage = (e) => this.onChatData(peerId, e.data as string)
+    chat.onmessage = (e) => this.onDataMessage(peerId, e.data as string)
     this.chatChannels.set(peerId, chat)
 
     this.pcs.set(peerId, pc)

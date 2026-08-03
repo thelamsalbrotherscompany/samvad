@@ -27,6 +27,8 @@ export type Participant = {
    * attach once the mesh transport lands. No stream → the initials placeholder.
    */
   stream?: MediaStream | null
+  /** A live emoji reaction to pop on this tile. Keyed by id so each new one re-animates. */
+  reaction?: { id: string; emoji: string }
   /** Index into TILE_WASHES. Stable per participant so tiles never re-colour. */
   wash: number
 }

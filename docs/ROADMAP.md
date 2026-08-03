@@ -87,7 +87,10 @@ useful on its own terms, even with everything below unbuilt.
     signalling server** — no middlebox can read it. Ephemeral (no history; late joiners see
     only new messages), with an unread badge on the Chat control. ⚠️ Built in core for now;
     to be **rebuilt as a plugin** once the plugin host lands, to prove the API is real
-- Reactions, and chat/reactions rebuilt *as plugins*
+- ✅ **Emoji reactions** (`ReactionsOverlay` + picker in the control bar): sent over the same
+    P2P data channel (tagged `chat` | `reaction`), float up and fade, auto-expire — nothing
+    stored. Respects `prefers-reduced-motion`. Same "rebuild as a plugin later" note as chat
+- Chat + reactions rebuilt *as plugins*, to prove the API is real
 
 **Done when:** a contributor writes a working effect plugin using only public docs, and
 it cannot reach the network.

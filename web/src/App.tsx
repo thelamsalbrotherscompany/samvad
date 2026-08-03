@@ -14,11 +14,7 @@ import { Lobby } from '@/features/room/Lobby'
 import { KnockRequests } from '@/features/room/KnockRequests'
 import { Home } from '@/features/home/Home'
 import { LockIcon } from '@/design/icons'
-import {
-  TILE_WASHES,
-  makeParticipants,
-  type Participant,
-} from '@/core/participants'
+import { TILE_WASHES, type Participant } from '@/core/participants'
 import { useLocalMedia } from '@/core/media/useLocalMedia'
 import { useActiveSpeaker } from '@/core/media/useActiveSpeaker'
 import { useProcessedStream } from '@/core/effects/useProcessedStream'
@@ -95,9 +91,6 @@ export default function App() {
   // Real screen capture (getDisplayMedia). Presenting ⇔ this is non-null.
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null)
   const sharing = screenStream !== null
-  // Padding count for solo layout testing (the "Phase 0" pill). Defaults to 1 so a
-  // real call starts on the waiting screen and fills with real people as they join.
-  const [count, setCount] = useState(1)
   const [view, setView] = useState<StageView>('auto')
   const [displayName, setDisplayName] = useState('Sangam Lamsal')
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
@@ -189,21 +182,11 @@ export default function App() {
     wash: (i + 1) % TILE_WASHES.length,
   }))
 
-  // Fake padding — for judging the layout at scale WITHOUT opening 30 tabs. Only when
-  // you're actually alone; a real call shows real people, never phantom tiles.
-  const solo = remoteParticipants.length === 0
-  const padding: Participant[] = solo
-    ? makeParticipants(count)
-        .slice(1)
-        .map((p) => ({ ...p, mirrored: false, stream: undefined }))
-    : []
-
-  const roster = [selfParticipant, ...remoteParticipants, ...padding]
+  const roster = [selfParticipant, ...remoteParticipants]
   const participantCount = roster.length
 
   // Real voice-activity from live audio: who's talking (rings) + the dominant remote
-  // (featured tile). No audio sources until joined, and fake padding has none — so the
-  // simulation still drives solo/demo layout testing.
+  // (featured tile). No audio sources until joined.
   const active = useActiveSpeaker(
     joined
       ? [
@@ -213,18 +196,19 @@ export default function App() {
       : [],
     selfParticipant.id,
   )
-  const simSpeaker = useSimulatedSpeaker(
-    roster.map((p) => p.id),
-    joined && solo,
-  )
-  const speakingId = solo ? simSpeaker : active.dominantId
-  const speakingSet = solo
-    ? new Set(simSpeaker ? [simSpeaker] : [])
-    : active.speakingIds
+  const speakingId = active.dominantId
+
+  // Latest live reaction per participant, so it can pop on their tile (self reactions
+  // land on the self tile). Cleared automatically as reactions expire from the mesh.
+  const reactionByParticipant = new Map<string, { id: string; emoji: string }>()
+  for (const r of mesh.reactions) {
+    reactionByParticipant.set(r.self ? 'self' : r.senderId, { id: r.id, emoji: r.emoji })
+  }
 
   const withLiveState = roster.map((p) => ({
     ...p,
-    speaking: speakingSet.has(p.id) && !p.muted,
+    speaking: active.speakingIds.has(p.id) && !p.muted,
+    reaction: reactionByParticipant.get(p.id),
   }))
 
   const self = withLiveState.find((p) => p.isSelf) ?? withLiveState[0]
@@ -365,6 +349,7 @@ export default function App() {
               onOpenParticipants={() => setParticipantsOpen(true)}
               onOpenChat={() => setChatOpen(true)}
               chatUnread={chatUnread}
+              onReact={mesh.sendReaction}
               onLockView={() => setLocked(true)}
               onLeave={() => {
                 setLocked(false)
@@ -378,7 +363,6 @@ export default function App() {
                 goHome()
               }}
             />
-            <PhaseZeroControls count={count} onCount={setCount} visible={chromeVisible} />
 
             {/* Host-only: anyone knocking at the lobby. */}
             <KnockRequests knocks={mesh.knocks} onAdmit={mesh.admit} onDeny={mesh.deny} />
@@ -463,70 +447,4 @@ function ReconnectingBanner() {
       </div>
     </div>
   )
-}
-
-/**
- * PHASE 0 SCAFFOLDING — lets the grid solver be judged at every realistic room
- * size without WebRTC. Deleted in Phase 1.
- */
-function PhaseZeroControls({
-  count,
-  onCount,
-  visible,
-}: {
-  count: number
-  onCount: (n: number) => void
-  visible: boolean
-}) {
-  const sizes = [1, 2, 3, 4, 6, 9, 12, 20, 30]
-
-  return (
-    <div
-      className={cn(
-        // Centered near the top, clear of the control bar. Dev-only scaffolding —
-        // it won't exist in the product, so it just needs to stay out of the way.
-        'absolute inset-x-0 top-18 flex justify-center px-4 transition-opacity duration-200',
-        visible ? 'opacity-100' : 'pointer-events-none opacity-0',
-      )}
-    >
-      <div className="no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto rounded-full border border-line/60 bg-surface/70 p-1 backdrop-blur-xl">
-        <span className="shrink-0 px-2 text-[11px] tracking-wide text-ink-faint uppercase">
-          Phase 0
-        </span>
-        {sizes.map((n) => (
-          <button
-            key={n}
-            onClick={() => onCount(n)}
-            className={cn(
-              'size-7 shrink-0 rounded-full text-[12px] tabular-nums transition-colors duration-150',
-              n === count
-                ? 'bg-accent font-semibold text-base'
-                : 'text-ink-muted hover:bg-surface-2 hover:text-ink',
-            )}
-          >
-            {n}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-/** PHASE 0 SCAFFOLDING — rotates the active speaker so the ring can be seen in motion. */
-function useSimulatedSpeaker(ids: string[], active: boolean): string | null {
-  const [speaking, setSpeaking] = useState<string | null>(null)
-  const key = ids.join(',')
-
-  useEffect(() => {
-    if (!active) return
-    const pool = key.split(',').filter(Boolean)
-    if (pool.length === 0) return
-
-    const id = setInterval(() => {
-      setSpeaking(pool[Math.floor(Math.random() * pool.length)] ?? null)
-    }, 2600)
-    return () => clearInterval(id)
-  }, [key, active])
-
-  return speaking
 }

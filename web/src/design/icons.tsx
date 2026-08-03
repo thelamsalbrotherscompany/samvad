@@ -25,6 +25,7 @@ import {
   PhoneOff,
   SendHorizontal,
   Settings,
+  Smile,
   Share2,
   ShieldCheck,
   SquareUser,
@@ -48,6 +49,7 @@ export const ScreenShareIcon = MonitorUp
 export const UsersIcon = Users
 export const ChatIcon = MessageSquare
 export const SendIcon = SendHorizontal
+export const ReactIcon = Smile
 export const HandIcon = Hand
 export const LeaveIcon = PhoneOff
 export const ShieldIcon = ShieldCheck
