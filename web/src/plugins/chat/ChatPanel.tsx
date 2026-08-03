@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { Dialog } from 'radix-ui'
 import { CloseIcon, SendIcon } from '@/design/icons'
-import type { ChatMessage } from '@/core/transport/MeshTransport'
-import { initialsOf } from '@/core/participants'
 import { cn } from '@/lib/cn'
+import type { ChatMessage } from './store'
 
 type Props = {
   open: boolean
@@ -13,15 +12,14 @@ type Props = {
 }
 
 /**
- * In-call chat. Messages travel peer-to-peer over the WebRTC data channels — never the
- * signalling server — so they're end-to-end encrypted and no middlebox can read them.
- * Ephemeral by design: no history, so a late joiner sees only what's sent after they join.
+ * The chat panel — a right-side sheet with a message list and composer. Presentational:
+ * the chat plugin's toolbar control supplies the messages and the send handler. Messages
+ * travel P2P over the plugin's E2EE data topic; nothing is stored.
  */
 export function ChatPanel({ open, onOpenChange, messages, onSend }: Props) {
   const [draft, setDraft] = useState('')
   const endRef = useRef<HTMLDivElement>(null)
 
-  // Keep the newest message in view.
   useEffect(() => {
     if (open) endRef.current?.scrollIntoView({ block: 'end' })
   }, [messages, open])
@@ -34,7 +32,6 @@ export function ChatPanel({ open, onOpenChange, messages, onSend }: Props) {
   }
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    // Enter sends; Shift+Enter adds a newline.
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       submit()
@@ -119,7 +116,7 @@ function Message({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
               m.self ? 'bg-accent/20 text-accent' : 'bg-surface-2 text-ink-muted',
             )}
           >
-            {initialsOf(m.senderName)}
+            {initials(m.senderName)}
           </div>
         )}
       </div>
@@ -138,6 +135,13 @@ function Message({ m, grouped }: { m: ChatMessage; grouped: boolean }) {
       </div>
     </div>
   )
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (parts.length === 0) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
 }
 
 function formatTime(ts: number): string {

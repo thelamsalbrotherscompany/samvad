@@ -55,6 +55,8 @@ export type LifecycleEvent =
 export interface PluginContext {
   /** This client's own participant id — matches the self tile, for keying local state. */
   readonly selfId: string
+  /** This client's display name — so a plugin can label its own outgoing messages. */
+  readonly selfName: string
 
   /** Present iff the plugin declared a `data` capability. E2EE, on the plugin's topic. */
   data?: {

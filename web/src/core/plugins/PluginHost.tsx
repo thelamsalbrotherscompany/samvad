@@ -34,12 +34,15 @@ export type PluginDataApi = {
 export function PluginHost({
   plugins,
   selfId,
+  selfName,
   data,
   children,
 }: {
   plugins: readonly SamvadPlugin[]
   /** The self participant id, so plugins can key local state to the self tile. */
   selfId: string
+  /** The self display name, for labelling a plugin's own outgoing messages. */
+  selfName: string
   data: PluginDataApi
   children: ReactNode
 }) {
@@ -56,7 +59,7 @@ export function PluginHost({
         caps.filter((c): c is Extract<Capability, { type: 'ui' }> => c.type === 'ui').map((c) => c.slot),
       )
 
-      const ctx: PluginContext = { selfId }
+      const ctx: PluginContext = { selfId, selfName }
 
       if (dataCap) {
         // Namespaced by plugin id, so plugins can't read each other's traffic.

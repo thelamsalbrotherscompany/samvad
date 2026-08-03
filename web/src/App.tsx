@@ -8,7 +8,6 @@ import { PreJoin } from '@/features/prejoin/PreJoin'
 import { WaitingRoom } from '@/features/room/WaitingRoom'
 import { SettingsDialog } from '@/features/room/SettingsDialog'
 import { ParticipantsPanel } from '@/features/room/ParticipantsPanel'
-import { ChatPanel } from '@/features/room/ChatPanel'
 import { ShareDialog } from '@/features/room/ShareDialog'
 import { Lobby } from '@/features/room/Lobby'
 import { KnockRequests } from '@/features/room/KnockRequests'
@@ -25,6 +24,7 @@ import { generateRoomId } from '@/core/room/roomId'
 import { getSessionId, getCreatedRoom, setCreatedRoom } from '@/core/room/session'
 import { PluginHost } from '@/core/plugins/PluginHost'
 import reactionsPlugin from '@/plugins/reactions'
+import chatPlugin from '@/plugins/chat'
 import { useIdle } from '@/lib/useIdle'
 import { useIsNarrow } from '@/lib/useMediaQuery'
 import { DEFAULT_SETTINGS, type Settings } from '@/lib/settings'
@@ -32,7 +32,7 @@ import { cn } from '@/lib/cn'
 
 // First-party plugins, loaded with every call. Each is built on the public plugin API
 // only — no privileged core access (docs/PLUGINS.md).
-const PLUGINS = [reactionsPlugin]
+const PLUGINS = [reactionsPlugin, chatPlugin]
 
 export default function App() {
   const { roomId, enterRoom, leaveRoom } = useRoom()
@@ -113,8 +113,6 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [participantsOpen, setParticipantsOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
-  const [chatOpen, setChatOpen] = useState(false)
-  const [chatSeen, setChatSeen] = useState(0)
   const [locked, setLocked] = useState(false)
   // A remote participant pinned to the featured slot — a local view choice.
   const [pinnedId, setPinnedId] = useState<string | null>(null)
@@ -152,15 +150,6 @@ export default function App() {
     handRaised,
   })
   const phase = mesh.phase // 'connecting' | 'waiting' | 'admitted' | 'denied'
-
-  // Chat unread: messages that landed while the panel was closed. Open panel ⇒ all seen.
-  useEffect(() => {
-    if (chatOpen) setChatSeen(mesh.messages.length)
-  }, [chatOpen, mesh.messages.length])
-  useEffect(() => {
-    if (!joined) setChatSeen(0)
-  }, [joined])
-  const chatUnread = Math.max(0, mesh.messages.length - chatSeen)
 
   const togglePin = (id: string) => setPinnedId((cur) => (cur === id ? null : id))
   // Drop the pin if that person has left, so the stage doesn't feature a ghost.
@@ -292,6 +281,7 @@ export default function App() {
           <PluginHost
             plugins={PLUGINS}
             selfId={selfParticipant.id}
+            selfName={displayName}
             data={{ send: mesh.sendData, subscribe: mesh.subscribeData }}
           >
             <TileActionsContext.Provider
@@ -363,8 +353,6 @@ export default function App() {
               onToggleView={() => setView(layout === 'speaker' ? 'grid' : 'speaker')}
               onOpenSettings={() => setSettingsOpen(true)}
               onOpenParticipants={() => setParticipantsOpen(true)}
-              onOpenChat={() => setChatOpen(true)}
-              chatUnread={chatUnread}
               onLockView={() => setLocked(true)}
               onLeave={() => {
                 setLocked(false)
@@ -441,14 +429,6 @@ export default function App() {
           />
         )}
 
-        {inRoom && joined && phase === 'admitted' && (
-          <ChatPanel
-            open={chatOpen}
-            onOpenChange={setChatOpen}
-            messages={mesh.messages}
-            onSend={mesh.sendChat}
-          />
-        )}
       </div>
     </TooltipProvider>
   )

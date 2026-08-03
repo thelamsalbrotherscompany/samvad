@@ -89,10 +89,12 @@ useful on its own terms, even with everything below unbuilt.
     Background → Image` opens a local file picker. Bundling stock backgrounds and
     pipeline-based noise suppression are what's left of the effects set
 - ✅ UI slots and data-channel topics (part of the plugin host above)
-- ✅ **Reactions rebuilt as a first-party plugin** (`web/src/plugins/reactions/`) — the
-  dogfood test of the API (docs/PLUGINS.md §8). It declares one data topic + two UI slots
-  and imports **only** the public plugin API (plus the design system) — no core internals.
-  Reactions behave identically; they just no longer live in core. Chat is next to migrate
+- ✅ **Reactions and chat rebuilt as first-party plugins** (`web/src/plugins/reactions/`,
+  `web/src/plugins/chat/`) — the dogfood test of the API (docs/PLUGINS.md §8). Each imports
+  **only** the public plugin API (plus the design system), no core internals. Reactions uses
+  a data topic + toolbar + tile-overlay slots; chat uses a data topic + the toolbar slot and
+  owns its own button, unread badge, and panel — needing *no* sidebar-slot machinery in core,
+  which is itself evidence the minimal API generalises. Both behave identically to before
 - ✅ **Chat** shipped (`web/src/features/room/ChatPanel.tsx`): text rides the **WebRTC data
     channels** (one negotiated channel per peer), so it's **E2EE and never touches the
     signalling server** — no middlebox can read it. Ephemeral (no history; late joiners see

@@ -24,21 +24,6 @@ export type RemotePeer = PeerInfo & {
   screenStream: MediaStream | null
 }
 
-/**
- * A chat message. Chat rides the P2P data channels — never the signalling server — so it's
- * end-to-end encrypted by construction and no middlebox can read it. Ephemeral: there's no
- * history, so a late joiner sees only messages sent after they arrived.
- */
-export type ChatMessage = {
-  id: string
-  senderId: string
-  senderName: string
-  text: string
-  ts: number
-  /** True for messages you sent (shown immediately, not echoed back over the wire). */
-  self: boolean
-}
-
 /** A join/left event, so the host can see who came and went mid-call. In-memory only. */
 export type ActivityEvent = {
   id: string
@@ -69,7 +54,6 @@ type Handlers = {
   onHost: (isHost: boolean) => void
   onKnocks: (knocks: PeerInfo[]) => void
   onLobbyOpen: (open: boolean) => void
-  onChat: (msg: ChatMessage) => void
   onData: (topic: string, from: string, payload: unknown) => void
   onActivity: (e: ActivityEvent) => void
 }
@@ -255,27 +239,10 @@ export class MeshTransport {
     this.sendToServer({ type: 'end' })
   }
 
-  /** Broadcast a chat message to every connected peer — P2P, never via the server. */
-  sendChat(text: string): void {
-    const body = text.trim()
-    if (!body) return
-    const ts = Date.now()
-    this.broadcastData(JSON.stringify({ t: 'chat', name: this.identity.name, text: body, ts }))
-    // Our own message shows immediately; it's never echoed back over the wire.
-    this.handlers.onChat({
-      id: crypto.randomUUID(),
-      senderId: this.selfId,
-      senderName: this.identity.name,
-      text: body,
-      ts,
-      self: true,
-    })
-  }
-
   /**
-   * Send arbitrary plugin data on a topic — to the whole room or one peer. Rides the same
-   * P2P data channel as chat, so it's E2EE and never touches the server. Own sends are not
-   * echoed back; the plugin handles its own local effect.
+   * Send arbitrary plugin data on a topic — to the whole room or one peer. Rides the P2P
+   * data channel, so it's E2EE and never touches the server. Own sends are not echoed back;
+   * the plugin handles its own local effect. (Chat and reactions are built on this.)
    */
   sendData(topic: string, payload: unknown, opts?: { to?: string }): void {
     const wire = JSON.stringify({ t: 'topic', topic, payload })
@@ -306,32 +273,15 @@ export class MeshTransport {
   }
 
   private onDataMessage(peerId: string, raw: string): void {
-    let data: { t?: unknown; name?: unknown; text?: unknown; ts?: unknown; topic?: unknown; payload?: unknown }
+    let data: { t?: unknown; topic?: unknown; payload?: unknown }
     try {
       data = JSON.parse(raw) as typeof data
     } catch {
       return
     }
-
-    // Plugin traffic: relay to the topic dispatcher.
+    // All data-channel traffic (chat, reactions, any plugin) is topic-addressed.
     if (data.t === 'topic' && typeof data.topic === 'string') {
       this.handlers.onData(data.topic, peerId, data.payload)
-      return
-    }
-
-    // Core chat.
-    if (data.t === 'chat' && typeof data.text === 'string' && data.text) {
-      const peer = this.peers.get(peerId)
-      const senderName =
-        typeof data.name === 'string' && data.name ? data.name : peer?.name || 'Guest'
-      this.handlers.onChat({
-        id: crypto.randomUUID(),
-        senderId: peerId,
-        senderName,
-        text: data.text,
-        ts: typeof data.ts === 'number' ? data.ts : Date.now(),
-        self: false,
-      })
     }
   }
 
