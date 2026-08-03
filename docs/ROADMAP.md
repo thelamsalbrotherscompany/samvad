@@ -6,18 +6,20 @@ video call while the SFU is still unwritten.
 
 ---
 
-## Phase 0 — Shell and design system
+## Phase 0 — Shell and design system ✅
 
 *No media. Prove the product feels right before making it work.*
 
-- Design tokens: color, type scale, spacing, motion, elevation
-- Core primitives: Button, Toggle, Tooltip, Dialog, Popover, Avatar, Tile
-- Screens: landing, pre-join (device check, mic meter, camera preview), in-room, post-call
-- Stage layout engine with fake participants — grid, spotlight, sidebar; smooth reflow
-- Go binary serving the embedded Vite build
+- ✅ Design tokens: color, type scale, spacing, motion, elevation
+- ✅ Core primitives: Button, Toggle, Tooltip, Dialog, Popover, Avatar, Tile
+- ✅ Screens: landing, pre-join (device check, mic meter, camera preview), in-room, post-call
+- ✅ Stage layout engine — grid, spotlight, sidebar; smooth reflow (validated with temporary
+  fake participants, since removed once real calls landed)
+- ✅ Frontend served as a **static SPA** (Vite → Cloudflare Pages) — the early "Go binary
+  serving the embedded build" idea was dropped; the app is static, the Worker does signalling
 
-**Done when:** a fake 12-person meeting is navigable and genuinely looks designed.
-Clickable, no WebRTC.
+**Was done when:** a 12-person meeting was navigable and genuinely looked designed.
+Superseded by Phase 1's real calls.
 
 ---
 

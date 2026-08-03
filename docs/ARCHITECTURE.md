@@ -206,25 +206,28 @@ has attacked yours yet.
 
 ```
 samvad/
-├── worker/                    # Cloudflare Worker + Durable Objects
+├── worker/                    # Cloudflare Worker + one Durable Object per room
 │   ├── src/
-│   │   ├── index.ts           # router, static asset passthrough
-│   │   ├── room.ts            # RoomDO — membership + signalling, in-memory
-│   │   └── token.ts           # stateless Ed25519 issue/verify
+│   │   ├── index.ts           # router: /ws → room DO, /ice (STUN/TURN), /health
+│   │   ├── room.ts            # RoomDO — membership, lobby, signalling relay (in-memory)
+│   │   ├── protocol.ts        # the client/server message contract
+│   │   └── ice.ts             # STUN + server-minted Cloudflare TURN credentials
 │   └── wrangler.toml
 ├── web/
 │   ├── src/
-│   │   ├── core/              # Transport interface + Mesh/Realtime/Pion impls,
-│   │   │                      #   media pipeline, plugin host, crypto
+│   │   ├── core/              # Transport interface + MeshTransport, media, rooms,
+│   │   │                      #   plugin host, crypto (MLS + frame cipher)
 │   │   ├── design/            # tokens, primitives, icons — the design system
-│   │   ├── features/          # stage, roster, controls
-│   │   └── plugins/           # first-party plugins, via the public plugin API
+│   │   ├── features/          # stage, roster, controls, panels, pre-join, home
+│   │   └── plugins/           # first-party plugins (reactions, chat), via the public API
 │   └── index.html
-├── crypto/                    # Rust → WASM, MLS via OpenMLS
-├── plugins/                   # example + community plugins
-├── selfhost/                  # Phase 6+: Go + Pion SFU for sovereignty
+├── crypto/mls/                # Rust crate: MLS via OpenMLS → WASM (vendored into web/)
+├── selfhost/                  # Go + Pion self-hosted SFU (the sovereignty exit)
 └── docs/
 ```
+
+*(`RealtimeTransport` and `PionTransport` from §3 are not yet in `core/` — only the `Transport`
+interface and `MeshTransport` are built today. The self-hosted SFU server lives in `selfhost/`.)*
 
 **Rule with teeth:** first-party plugins in `web/src/plugins/` may only use the public
 plugin API — no privileged imports from `core/`. If blur can't be built through the public
@@ -237,5 +240,8 @@ system honest.
 
 - [`ROADMAP.md`](ROADMAP.md) — build order and what ships when
 - [`PLUGINS.md`](PLUGINS.md) — the module/plugin contract
+- [`PLUGIN-AUTHORING.md`](PLUGIN-AUTHORING.md) — how to build & register a plugin today
 - [`THREAT-MODEL.md`](THREAT-MODEL.md) — what Samvad protects against, and what it doesn't
+- [`DESIGN.md`](DESIGN.md) — visual and interaction direction
+- [`../CONTRIBUTING.md`](../CONTRIBUTING.md) — setup, conventions, and the non-negotiables
 - [`DESIGN.md`](DESIGN.md) — visual and interaction direction
