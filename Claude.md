@@ -7,7 +7,8 @@ Author: Sangam Lamsal.
 
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — system design, no-database model, stack
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — build order, what ships when
-- [`docs/PLUGINS.md`](docs/PLUGINS.md) — plugin contract and capability sandbox
+- [`docs/PLUGINS.md`](docs/PLUGINS.md) — plugin contract and capability sandbox (the design)
+- [`docs/PLUGIN-AUTHORING.md`](docs/PLUGIN-AUTHORING.md) — how to build & register a plugin today
 - [`docs/THREAT-MODEL.md`](docs/THREAT-MODEL.md) — guarantees and their limits
 - [`docs/DESIGN.md`](docs/DESIGN.md) — visual and interaction direction
 

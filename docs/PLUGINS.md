@@ -1,5 +1,10 @@
 # Samvad — Plugin Architecture
 
+> **Building a plugin?** This document is the *design* — the full contract and the security
+> model it's heading toward. For a practical, accurate "write one today" guide against what
+> is **actually implemented right now**, start with
+> [`PLUGIN-AUTHORING.md`](PLUGIN-AUTHORING.md).
+
 The goal: a contributor should be able to add background blur, a whiteboard, live
 captions, or a reaction system **without touching Samvad's core** — and a user should be
 able to install that plugin without extending any trust to its author.

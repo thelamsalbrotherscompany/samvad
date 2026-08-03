@@ -22,7 +22,7 @@ import { useMesh } from '@/core/transport/useMesh'
 import { useRoom } from '@/core/room/useRoom'
 import { generateRoomId } from '@/core/room/roomId'
 import { getSessionId, getCreatedRoom, setCreatedRoom } from '@/core/room/session'
-import { PluginHost } from '@/core/plugins/PluginHost'
+import { PluginHost, PluginStageOverlay } from '@/core/plugins/PluginHost'
 import reactionsPlugin from '@/plugins/reactions'
 import chatPlugin from '@/plugins/chat'
 import { useIdle } from '@/lib/useIdle'
@@ -325,6 +325,9 @@ export default function App() {
             {/* The socket dropped; we're auto-reconnecting to reclaim our spot. Shown
                 even when the chrome is hidden — losing the call matters more than immersion. */}
             {!mesh.connected && <ReconnectingBanner />}
+
+            {/* Plugin-contributed overlays over the stage (positioned by each plugin). */}
+            <PluginStageOverlay />
 
             <RoomChrome
               roomName={roomId}
