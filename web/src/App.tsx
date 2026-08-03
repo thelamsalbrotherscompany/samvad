@@ -8,6 +8,7 @@ import { PreJoin } from '@/features/prejoin/PreJoin'
 import { WaitingRoom } from '@/features/room/WaitingRoom'
 import { SettingsDialog } from '@/features/room/SettingsDialog'
 import { ParticipantsPanel } from '@/features/room/ParticipantsPanel'
+import { ChatPanel } from '@/features/room/ChatPanel'
 import { ShareDialog } from '@/features/room/ShareDialog'
 import { Lobby } from '@/features/room/Lobby'
 import { KnockRequests } from '@/features/room/KnockRequests'
@@ -113,6 +114,8 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [participantsOpen, setParticipantsOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatSeen, setChatSeen] = useState(0)
   const [locked, setLocked] = useState(false)
 
   const patchSettings = (patch: Partial<Settings>) =>
@@ -148,6 +151,15 @@ export default function App() {
     handRaised,
   })
   const phase = mesh.phase // 'connecting' | 'waiting' | 'admitted' | 'denied'
+
+  // Chat unread: messages that landed while the panel was closed. Open panel ⇒ all seen.
+  useEffect(() => {
+    if (chatOpen) setChatSeen(mesh.messages.length)
+  }, [chatOpen, mesh.messages.length])
+  useEffect(() => {
+    if (!joined) setChatSeen(0)
+  }, [joined])
+  const chatUnread = Math.max(0, mesh.messages.length - chatSeen)
 
   // You, real.
   const selfParticipant: Participant = {
@@ -351,6 +363,8 @@ export default function App() {
               onToggleView={() => setView(layout === 'speaker' ? 'grid' : 'speaker')}
               onOpenSettings={() => setSettingsOpen(true)}
               onOpenParticipants={() => setParticipantsOpen(true)}
+              onOpenChat={() => setChatOpen(true)}
+              chatUnread={chatUnread}
               onLockView={() => setLocked(true)}
               onLeave={() => {
                 setLocked(false)
@@ -423,6 +437,15 @@ export default function App() {
             isHost={mesh.isHost}
             lobbyOpen={mesh.lobbyOpen}
             onSetLobbyOpen={mesh.setLobbyOpen}
+          />
+        )}
+
+        {inRoom && joined && phase === 'admitted' && (
+          <ChatPanel
+            open={chatOpen}
+            onOpenChange={setChatOpen}
+            messages={mesh.messages}
+            onSend={mesh.sendChat}
           />
         )}
       </div>

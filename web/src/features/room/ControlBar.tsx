@@ -42,6 +42,9 @@ type Props = {
   onToggleView: () => void
   onOpenSettings: () => void
   onOpenParticipants: () => void
+  onOpenChat: () => void
+  /** Unread chat messages — badged on the Chat control (and the mobile More button). */
+  chatUnread: number
   onLockView: () => void
   onLeave: () => void
   onEndForAll: () => void
@@ -65,6 +68,8 @@ export function ControlBar({
   onToggleView,
   onOpenSettings,
   onOpenParticipants,
+  onOpenChat,
+  chatUnread,
   onLockView,
   onLeave,
   onEndForAll,
@@ -99,7 +104,7 @@ export function ControlBar({
       soloHidden: true,
     },
     { label: 'Participants', icon: <UsersIcon />, onClick: onOpenParticipants },
-    { label: 'Chat', icon: <ChatIcon />, soloHidden: true },
+    { label: 'Chat', icon: <ChatIcon />, onClick: onOpenChat, badge: chatUnread, soloHidden: true },
     {
       label: 'Hide controls',
       icon: <LockIcon />,
@@ -148,16 +153,7 @@ export function ControlBar({
           // Solo: only self-setup actions remain, few enough to sit inline everywhere.
           <div className="flex items-center gap-2">
             {secondaryShown.map((a) => (
-              <ControlButton
-                key={a.label}
-                label={a.label}
-                size="md"
-                active={a.active}
-                activeTone={a.activeTone}
-                onClick={a.onClick}
-              >
-                {a.icon}
-              </ControlButton>
+              <SecondaryButton key={a.label} a={a} />
             ))}
           </div>
         ) : (
@@ -165,22 +161,13 @@ export function ControlBar({
             {/* Desktop: the full row. */}
             <div className="hidden items-center gap-2 md:flex">
               {secondaryShown.map((a) => (
-                <ControlButton
-                  key={a.label}
-                  label={a.label}
-                  size="md"
-                  active={a.active}
-                  activeTone={a.activeTone}
-                  onClick={a.onClick}
-                >
-                  {a.icon}
-                </ControlButton>
+                <SecondaryButton key={a.label} a={a} />
               ))}
             </div>
 
             {/* Phone: everything secondary behind one button. */}
             <div className="md:hidden">
-              <MoreMenu actions={secondaryShown} />
+              <MoreMenu actions={secondaryShown} badge={chatUnread} />
             </div>
           </>
         )}
@@ -201,7 +188,37 @@ type SecondaryAction = {
   activeTone?: 'danger' | 'accent'
   /** Hidden when you're the only one here — needs an audience or a stage. */
   soloHidden?: boolean
+  /** Unread count badged on the control (0 = none). */
+  badge?: number
   onClick?: () => void
+}
+
+/** A small accent count badge for a control (chat unread, etc.). */
+function CountBadge({ n }: { n: number }) {
+  if (n <= 0) return null
+  return (
+    <span className="pointer-events-none absolute -top-0.5 -right-0.5 grid min-w-4.5 place-items-center rounded-full bg-accent px-1 text-[10px] font-semibold text-base tabular-nums ring-2 ring-surface">
+      {n > 9 ? '9+' : n}
+    </span>
+  )
+}
+
+/** A secondary control with an optional unread badge. */
+function SecondaryButton({ a }: { a: SecondaryAction }) {
+  return (
+    <div className="relative">
+      <ControlButton
+        label={a.label}
+        size="md"
+        active={a.active}
+        activeTone={a.activeTone}
+        onClick={a.onClick}
+      >
+        {a.icon}
+      </ControlButton>
+      <CountBadge n={a.badge ?? 0} />
+    </div>
+  )
 }
 
 /**
@@ -273,17 +290,18 @@ function LeaveControl({
   )
 }
 
-function MoreMenu({ actions }: { actions: SecondaryAction[] }) {
+function MoreMenu({ actions, badge = 0 }: { actions: SecondaryAction[]; badge?: number }) {
   return (
     <Popover.Root>
       <Popover.Trigger asChild>
         <button
           aria-label="More options"
-          className="inline-grid size-12 place-items-center rounded-full bg-surface-2 text-ink transition-all duration-200 ease-out hover:bg-line active:scale-95"
+          className="relative inline-grid size-12 place-items-center rounded-full bg-surface-2 text-ink transition-all duration-200 ease-out hover:bg-line active:scale-95"
         >
           <span className="size-5.5 [&_svg]:size-full">
             <MoreIcon />
           </span>
+          <CountBadge n={badge} />
         </button>
       </Popover.Trigger>
       <Popover.Portal>

@@ -23,6 +23,7 @@ import {
   MonitorUp,
   MoreHorizontal,
   PhoneOff,
+  SendHorizontal,
   Settings,
   Share2,
   ShieldCheck,
@@ -46,6 +47,7 @@ export const VideoOffIcon = VideoOff
 export const ScreenShareIcon = MonitorUp
 export const UsersIcon = Users
 export const ChatIcon = MessageSquare
+export const SendIcon = SendHorizontal
 export const HandIcon = Hand
 export const LeaveIcon = PhoneOff
 export const ShieldIcon = ShieldCheck

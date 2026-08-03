@@ -82,7 +82,12 @@ useful on its own terms, even with everything below unbuilt.
     Background → Image` opens a local file picker. Bundling stock backgrounds and
     pipeline-based noise suppression are what's left of the effects set
 - UI slots and data-channel topics
-- Chat and reactions rebuilt *as plugins*, to prove the API is real
+- ✅ **Chat** shipped (`web/src/features/room/ChatPanel.tsx`): text rides the **WebRTC data
+    channels** (one negotiated channel per peer), so it's **E2EE and never touches the
+    signalling server** — no middlebox can read it. Ephemeral (no history; late joiners see
+    only new messages), with an unread badge on the Chat control. ⚠️ Built in core for now;
+    to be **rebuilt as a plugin** once the plugin host lands, to prove the API is real
+- Reactions, and chat/reactions rebuilt *as plugins*
 
 **Done when:** a contributor writes a working effect plugin using only public docs, and
 it cannot reach the network.

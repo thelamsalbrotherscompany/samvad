@@ -24,6 +24,21 @@ export type RemotePeer = PeerInfo & {
   screenStream: MediaStream | null
 }
 
+/**
+ * A chat message. Chat rides the P2P data channels — never the signalling server — so it's
+ * end-to-end encrypted by construction and no middlebox can read it. Ephemeral: there's no
+ * history, so a late joiner sees only messages sent after they arrived.
+ */
+export type ChatMessage = {
+  id: string
+  senderId: string
+  senderName: string
+  text: string
+  ts: number
+  /** True for messages you sent (shown immediately, not echoed back over the wire). */
+  self: boolean
+}
+
 /** Where you are relative to the room's lobby. */
 export type Phase =
   | 'connecting'
@@ -46,6 +61,7 @@ type Handlers = {
   onHost: (isHost: boolean) => void
   onKnocks: (knocks: PeerInfo[]) => void
   onLobbyOpen: (open: boolean) => void
+  onChat: (msg: ChatMessage) => void
 }
 
 export class MeshTransport {
@@ -56,6 +72,8 @@ export class MeshTransport {
   // screen → me (keyed by presenter). Kept apart so I can present and view at once.
   private readonly outScreenPcs = new Map<string, RTCPeerConnection>()
   private readonly inScreenPcs = new Map<string, RTCPeerConnection>()
+  // One negotiated data channel per peer for chat — E2EE, never via the server.
+  private readonly chatChannels = new Map<string, RTCDataChannel>()
   private readonly peers = new Map<string, RemotePeer>()
   private readonly knocks = new Map<string, PeerInfo>()
   private readonly roomName: string
@@ -164,6 +182,7 @@ export class MeshTransport {
   private resetPeers(): void {
     for (const pc of this.pcs.values()) pc.close()
     this.pcs.clear()
+    this.chatChannels.clear()
     for (const pc of this.outScreenPcs.values()) pc.close()
     this.outScreenPcs.clear()
     for (const pc of this.inScreenPcs.values()) pc.close()
@@ -226,6 +245,52 @@ export class MeshTransport {
     this.sendToServer({ type: 'end' })
   }
 
+  /** Broadcast a chat message to every connected peer — P2P, never via the server. */
+  sendChat(text: string): void {
+    const body = text.trim()
+    if (!body) return
+    const ts = Date.now()
+    const payload = JSON.stringify({ name: this.identity.name, text: body, ts })
+    for (const ch of this.chatChannels.values()) {
+      if (ch.readyState === 'open') {
+        try {
+          ch.send(payload)
+        } catch {
+          // Channel mid-close — skip it.
+        }
+      }
+    }
+    // Our own message shows immediately; it's never echoed back over the wire.
+    this.handlers.onChat({
+      id: crypto.randomUUID(),
+      senderId: this.selfId,
+      senderName: this.identity.name,
+      text: body,
+      ts,
+      self: true,
+    })
+  }
+
+  private onChatData(peerId: string, raw: string): void {
+    let data: { name?: unknown; text?: unknown; ts?: unknown }
+    try {
+      data = JSON.parse(raw) as typeof data
+    } catch {
+      return
+    }
+    if (typeof data.text !== 'string' || !data.text) return
+    const peer = this.peers.get(peerId)
+    this.handlers.onChat({
+      id: crypto.randomUUID(),
+      senderId: peerId,
+      senderName:
+        typeof data.name === 'string' && data.name ? data.name : peer?.name || 'Guest',
+      text: data.text,
+      ts: typeof data.ts === 'number' ? data.ts : Date.now(),
+      self: false,
+    })
+  }
+
   /** Push a presence change (mute / camera / hand) to the room. */
   updateIdentity(identity: PeerInfo): void {
     this.identity = identity
@@ -251,6 +316,7 @@ export class MeshTransport {
     this.sendToServer({ type: 'leave' })
     for (const pc of this.pcs.values()) pc.close()
     this.pcs.clear()
+    this.chatChannels.clear()
     for (const pc of this.outScreenPcs.values()) pc.close()
     this.outScreenPcs.clear()
     for (const pc of this.inScreenPcs.values()) pc.close()
@@ -386,6 +452,12 @@ export class MeshTransport {
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'failed') pc.restartIce()
     }
+
+    // Negotiated data channel for chat: both sides create the same id, so it needs no
+    // offer/answer of its own and opens as soon as the connection is up.
+    const chat = pc.createDataChannel('samvad-chat', { negotiated: true, id: 0 })
+    chat.onmessage = (e) => this.onChatData(peerId, e.data as string)
+    this.chatChannels.set(peerId, chat)
 
     this.pcs.set(peerId, pc)
     return pc
@@ -584,6 +656,7 @@ export class MeshTransport {
   private dropPeer(id: string): void {
     this.pcs.get(id)?.close()
     this.pcs.delete(id)
+    this.chatChannels.delete(id)
     this.outScreenPcs.get(id)?.close()
     this.outScreenPcs.delete(id)
     this.inScreenPcs.get(id)?.close()

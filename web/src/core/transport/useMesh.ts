@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { MeshTransport, type Phase, type RemotePeer } from './MeshTransport'
+import { MeshTransport, type ChatMessage, type Phase, type RemotePeer } from './MeshTransport'
 import type { PeerInfo } from './protocol'
 
 type Options = {
@@ -26,11 +26,13 @@ export type Mesh = {
   lobbyOpen: boolean
   peers: RemotePeer[]
   knocks: PeerInfo[]
+  messages: ChatMessage[]
   admit: (id: string) => void
   deny: (id: string) => void
   setLobbyOpen: (open: boolean) => void
   kick: (id: string) => void
   end: () => void
+  sendChat: (text: string) => void
 }
 
 /**
@@ -45,6 +47,7 @@ export function useMesh(opts: Options): Mesh {
   const [phase, setPhase] = useState<Phase>('connecting')
   const [isHost, setIsHost] = useState(false)
   const [lobbyOpen, setLobbyOpenState] = useState(false)
+  const [messages, setMessages] = useState<ChatMessage[]>([])
   const ref = useRef<MeshTransport | null>(null)
 
   useEffect(() => {
@@ -70,6 +73,7 @@ export function useMesh(opts: Options): Mesh {
         onHost: setIsHost,
         onKnocks: setKnocks,
         onLobbyOpen: setLobbyOpenState,
+        onChat: (m) => setMessages((prev) => [...prev, m]),
       },
     )
     transport.connect()
@@ -80,6 +84,7 @@ export function useMesh(opts: Options): Mesh {
       ref.current = null
       setPeers([])
       setKnocks([])
+      setMessages([])
       setConnected(false)
       setPhase('connecting')
       setIsHost(false)
@@ -114,6 +119,7 @@ export function useMesh(opts: Options): Mesh {
   const setLobbyOpen = useCallback((open: boolean) => ref.current?.setLobbyOpen(open), [])
   const kick = useCallback((id: string) => ref.current?.kick(id), [])
   const end = useCallback(() => ref.current?.end(), [])
+  const sendChat = useCallback((text: string) => ref.current?.sendChat(text), [])
 
   return {
     connected,
@@ -122,10 +128,12 @@ export function useMesh(opts: Options): Mesh {
     lobbyOpen,
     peers,
     knocks,
+    messages,
     admit,
     deny,
     setLobbyOpen,
     kick,
     end,
+    sendChat,
   }
 }
