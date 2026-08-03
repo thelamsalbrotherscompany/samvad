@@ -44,8 +44,16 @@ export function ParticipantsPanel({
 }: Props) {
   const [tab, setTab] = useState<Tab>('people')
   const [query, setQuery] = useState('')
+  const [activityQuery, setActivityQuery] = useState('')
+  const [activityFilter, setActivityFilter] = useState<'all' | 'joined' | 'left'>('all')
   const q = query.trim().toLowerCase()
   const shown = q ? participants.filter((p) => p.name.toLowerCase().includes(q)) : participants
+  const aq = activityQuery.trim().toLowerCase()
+  const shownActivity = activity.filter(
+    (e) =>
+      (activityFilter === 'all' || e.kind === activityFilter) &&
+      (!aq || e.name.toLowerCase().includes(aq)),
+  )
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -152,32 +160,68 @@ export function ParticipantsPanel({
               </div>
             </>
           ) : (
-            <div className="mt-4 min-h-0 flex-1 space-y-0.5 overflow-y-auto">
-              {activity.length === 0 ? (
-                <div className="px-2 py-10 text-center text-[13px] text-ink-faint">
-                  No one has come or gone yet.
-                </div>
-              ) : (
-                activity.map((e) => (
-                  <div key={e.id} className="flex items-center gap-3 px-2 py-2">
-                    <span
-                      className={cn(
-                        'size-2 shrink-0 rounded-full',
-                        e.kind === 'joined' ? 'bg-accent-2' : 'bg-ink-faint',
-                      )}
-                    />
-                    <div className="min-w-0 flex-1 truncate text-[14px]">
-                      <span className="font-medium text-ink">{e.name}</span>{' '}
-                      <span className="text-ink-muted">
-                        {e.kind === 'joined' ? 'joined' : 'left'}
+            <div className="mt-4 flex min-h-0 flex-1 flex-col">
+              <div className="relative shrink-0">
+                <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-faint" />
+                <input
+                  value={activityQuery}
+                  onChange={(e) => setActivityQuery(e.target.value)}
+                  placeholder="Search activity"
+                  aria-label="Search activity"
+                  className="w-full rounded-xl border border-line bg-surface-2/40 py-2.5 pr-3 pl-9 text-[14px] text-ink placeholder:text-ink-faint focus:border-accent/60 focus:outline-none"
+                />
+              </div>
+
+              <div className="mt-3 flex shrink-0 gap-1.5">
+                {(['all', 'joined', 'left'] as const).map((f) => (
+                  <button
+                    key={f}
+                    onClick={() => setActivityFilter(f)}
+                    className={cn(
+                      'rounded-lg px-3 py-1 text-[12px] font-medium capitalize transition-colors',
+                      activityFilter === f
+                        ? 'bg-accent text-base'
+                        : 'bg-surface-2 text-ink-muted hover:text-ink',
+                    )}
+                  >
+                    {f}
+                  </button>
+                ))}
+              </div>
+
+              <div className="mt-3 min-h-0 flex-1 space-y-0.5 overflow-y-auto">
+                {shownActivity.length === 0 ? (
+                  <div className="px-2 py-10 text-center text-[13px] text-ink-faint">
+                    {aq
+                      ? `No activity matches “${activityQuery.trim()}”.`
+                      : activityFilter === 'joined'
+                        ? 'No arrivals yet.'
+                        : activityFilter === 'left'
+                          ? 'No one has left.'
+                          : 'No one has come or gone yet.'}
+                  </div>
+                ) : (
+                  shownActivity.map((e) => (
+                    <div key={e.id} className="flex items-center gap-3 px-2 py-2">
+                      <span
+                        className={cn(
+                          'size-2 shrink-0 rounded-full',
+                          e.kind === 'joined' ? 'bg-accent-2' : 'bg-ink-faint',
+                        )}
+                      />
+                      <div className="min-w-0 flex-1 truncate text-[14px]">
+                        <span className="font-medium text-ink">{e.name}</span>{' '}
+                        <span className="text-ink-muted">
+                          {e.kind === 'joined' ? 'joined' : 'left'}
+                        </span>
+                      </div>
+                      <span className="text-[12px] text-ink-faint tabular-nums">
+                        {formatTime(e.ts)}
                       </span>
                     </div>
-                    <span className="text-[12px] text-ink-faint tabular-nums">
-                      {formatTime(e.ts)}
-                    </span>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
           )}
         </Dialog.Content>
