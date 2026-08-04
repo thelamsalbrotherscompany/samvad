@@ -97,7 +97,9 @@ useful on its own terms, even with everything below unbuilt.
     uploaded, never persisted), and composited back into the published stream — so **peers see
     it too**, not just the local view. The plugin owns its own settings picker (the `settings`
     slot) and registers its transform only while an effect is on. Graceful fallback to the raw
-    camera when unsupported. Bundling stock backgrounds is what's left of the effects set
+    camera when unsupported. ✅ Ships **bundled stock backdrops** (`plugins/background/stock.ts`)
+    — gradient SVGs generated in code (no CDN, sharp at any size) that flow through the same
+    image path, alongside upload-your-own
   - ✅ **Noise gate** (`web/src/plugins/noise/`): a first-party **`audio-transform`** plugin —
     the dogfood proof that audio transforms work. High-pass (85 Hz, strips rumble) → an
     analyser-driven gain that attenuates the mic on silence with fast-attack / gentle-release

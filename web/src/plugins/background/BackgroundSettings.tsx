@@ -1,12 +1,13 @@
 import { useRef, type ChangeEvent, type ReactNode } from 'react'
 import { cn } from '@/lib/cn'
 import { useBackgroundStore, type BackgroundMode } from './store'
+import { STOCK_BACKGROUNDS } from './stock'
 
 /**
  * The background picker, contributed to the Settings dialog via the `settings` UI slot.
- * Blur / strong-blur / a virtual-background image the user picks from their own device —
- * read to a data URL and kept in memory only (never uploaded, never persisted). All state
- * lives in the plugin store; core knows nothing about it.
+ * Blur / strong-blur, a bundled stock backdrop, or a virtual-background image the user picks
+ * from their own device (read to a data URL and kept in memory only — never uploaded, never
+ * persisted). All state lives in the plugin store; core knows nothing about it.
  */
 
 const MODES: { value: BackgroundMode; label: string }[] = [
@@ -48,57 +49,81 @@ export function BackgroundSettings() {
   const fileRef = useRef<HTMLInputElement>(null)
   const pick = () => fileRef.current?.click()
 
+  const chooseImage = (url: string) => {
+    setImage(url)
+    setMode('image')
+  }
+
   const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = '' // let the same file be re-picked later
     if (!file) return
     try {
-      setImage(await readImageFile(file))
-      setMode('image')
+      chooseImage(await readImageFile(file))
     } catch {
       // Unreadable file — leave the background as it was.
     }
   }
 
+  const isImage = mode === 'image'
+  const customActive = isImage && !!image && !STOCK_BACKGROUNDS.some((b) => b.url === image)
+
   return (
     <section>
       <h3 className="mb-2 text-[12px] font-medium tracking-wide text-ink-faint uppercase">Background</h3>
-      <div className="space-y-2.5">
+      <div className="space-y-3">
         <div className="flex flex-wrap gap-1.5">
           {MODES.map((m) => (
             <Chip key={m.value} active={mode === m.value} onClick={() => setMode(m.value)}>
               {m.label}
             </Chip>
           ))}
-          <Chip active={mode === 'image'} onClick={() => (image ? setMode('image') : pick())}>
-            Image
-          </Chip>
         </div>
 
-        {(mode === 'image' || image) && (
-          <div className="flex items-center gap-3">
-            {image ? (
-              <img src={image} alt="" className="h-12 w-20 rounded-md object-cover ring-1 ring-line/60" />
-            ) : (
-              <div className="grid h-12 w-20 place-items-center rounded-md bg-surface-2 text-[11px] text-ink-faint ring-1 ring-line/60">
-                No image
-              </div>
-            )}
-            <button onClick={pick} className="text-[13px] text-accent hover:underline">
-              {image ? 'Change' : 'Choose image…'}
+        <div className="grid grid-cols-4 gap-1.5">
+          {STOCK_BACKGROUNDS.map((bg) => (
+            <button
+              key={bg.id}
+              onClick={() => chooseImage(bg.url)}
+              title={bg.label}
+              className={cn(
+                'aspect-video overflow-hidden rounded-md ring-1 transition',
+                isImage && image === bg.url ? 'ring-2 ring-accent' : 'ring-line/60 hover:ring-line',
+              )}
+            >
+              <img src={bg.url} alt={bg.label} className="size-full object-cover" />
             </button>
-            {image && (
-              <button
-                onClick={() => {
-                  setImage(null)
-                  if (mode === 'image') setMode('none')
-                }}
-                className="text-[13px] text-ink-faint transition-colors hover:text-ink"
-              >
-                Remove
-              </button>
-            )}
-          </div>
+          ))}
+
+          {/* Custom uploaded image gets its own selectable tile. */}
+          {customActive && image && (
+            <button
+              onClick={() => chooseImage(image)}
+              title="Your image"
+              className="aspect-video overflow-hidden rounded-md ring-2 ring-accent"
+            >
+              <img src={image} alt="Your background" className="size-full object-cover" />
+            </button>
+          )}
+
+          <button
+            onClick={pick}
+            className="grid aspect-video place-items-center rounded-md text-[11px] text-ink-faint ring-1 ring-dashed ring-line/60 transition hover:text-ink hover:ring-line"
+          >
+            Upload
+          </button>
+        </div>
+
+        {isImage && image && (
+          <button
+            onClick={() => {
+              setImage(null)
+              setMode('none')
+            }}
+            className="text-[13px] text-ink-faint transition-colors hover:text-ink"
+          >
+            Remove background image
+          </button>
         )}
 
         <input ref={fileRef} type="file" accept="image/*" onChange={onFile} className="hidden" />
