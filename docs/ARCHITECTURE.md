@@ -153,10 +153,15 @@ frame's payload with a key no server possesses. The SFU forwards bytes it cannot
 only touches RTP headers, which is all forwarding requires.
 
 - **Mesh (Phase 1)** — E2EE by construction. No middlebox exists to trust
-- **SFU (Phase 4)** — insertable streams. Key exchange via **MLS (RFC 9420)** using
-  OpenMLS, following the Orange Meets design. Originally planned as passphrase-derived
-  keys, but Orange Meets demonstrates MLS is tractable and it gives real forward secrecy
-  plus clean removal of departed participants
+- **SFU (built, on the self-hosted path)** — insertable streams with key exchange via **MLS
+  (RFC 9420)** using OpenMLS→WASM, following the Orange Meets design (real forward secrecy +
+  clean removal of departed participants). `PionTransport` wires the frame encryptor onto the
+  Go SFU connection and drives the MLS handshake over a Durable-Object data relay — MLS's
+  untrusted delivery service (the DO sees handshake bytes, never the media keys). It's
+  **verified**: unit tests for the cipher, native tests for MLS agreement/rotation, a Go SFU
+  test, and a headless-Chromium test proving frames encrypt/decrypt over live WebRTC while a
+  wrong key can't decode (see CONTRIBUTING → Testing). The hosted `RealtimeTransport`
+  (Cloudflare) reuses the identical crypto
 
 > **Landmine:** encrypting the *entire* frame breaks browser depacketization. Leave the
 > first 1–10 VP8 header bytes (version, dimensions) unencrypted. Orange Meets hit this;
@@ -226,8 +231,9 @@ samvad/
 └── docs/
 ```
 
-*(`RealtimeTransport` and `PionTransport` from §3 are not yet in `core/` — only the `Transport`
-interface and `MeshTransport` are built today. The self-hosted SFU server lives in `selfhost/`.)*
+*(`MeshTransport` and `PionTransport` are both in `core/transport/` today — mesh is the
+default, and `PionTransport` (opt in with `?sfu=1`) drives the self-hosted SFU in `selfhost/`
+with E2EE. `RealtimeTransport` (Cloudflare) is the one still to come.)*
 
 **Rule with teeth:** first-party plugins in `web/src/plugins/` may only use the public
 plugin API — no privileged imports from `core/`. If blur can't be built through the public

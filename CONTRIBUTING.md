@@ -24,24 +24,48 @@ feedback, not a bug).
 
 ## The components, and how to check each
 
-| Component | Dir | Build / check |
-|---|---|---|
-| Web app | `web/` | `bun run build` (strict `tsc` + Vite), `bun run lint` (oxlint) |
-| Signalling worker | `worker/` | `bun run typecheck`, `bun run dev` |
-| Self-hosted SFU | `selfhost/` | `go build ./...`, `go vet ./...`, `go run .` |
-| MLS crypto (WASM) | `crypto/mls/` | `./build.sh` (rebuilds wasm + vendors it into `web/`) |
+| Component | Dir | Build / check | Test |
+|---|---|---|---|
+| Web app | `web/` | `bun run build` (strict `tsc` + Vite), `bun run lint` (oxlint) | `bun run test` (unit), `bun run test:e2e` (browser) |
+| Signalling worker | `worker/` | `bun run typecheck`, `bun run dev` | — |
+| Self-hosted SFU | `selfhost/` | `go build ./...`, `go vet ./...`, `go run .` | `go test ./...` |
+| MLS crypto (WASM) | `crypto/mls/` | `./build.sh` (rebuilds wasm + vendors it into `web/`) | `cargo test` |
 
 **Always** run `bun run build` **and** `bun run lint` in `web/` before you push — the build
 is the type-check, and both must be clean. Go changes must `go build` and `go vet` clean.
 
+## Testing
+
+The privacy-critical parts have tests; run the ones your change touches.
+
+- **`web/` unit** (`bun run test`) — the frame cipher (`frameCrypto.test.ts`, real WebCrypto
+  round-trips) and the MLS coordinator (`E2eeSession.test.ts`, which loads the real OpenMLS
+  WASM and proves two parties agree on a key and that removal rotates it).
+- **`web/` browser** (`bun run test:e2e`, needs `npx playwright install chromium`) — the one
+  thing unit tests can't reach: it drives real Chromium and proves the frame cipher actually
+  encrypts/decrypts over **live WebRTC** (Insertable Streams), with a wrong key unable to
+  decode. See [`web/e2e/README.md`](web/e2e/README.md).
+- **`selfhost/`** (`go test ./...`) — the SFU's server-sole-offer signalling contract.
+- **`crypto/mls/`** (`cargo test`) — MLS group agreement and key rotation, natively.
+
+**If you touch `web/src/core/crypto/` or the transport's E2EE wiring, run `bun run test:e2e`.**
+A green unit suite doesn't prove the browser pipeline still round-trips; that test does.
+
+To exercise the **self-hosted SFU path** end-to-end, run three processes — worker + SFU + web
+— and open the app with **`?sfu=1`** (steps in [`selfhost/README.md`](selfhost/README.md)).
+Media then flows through the SFU with the full UI, E2EE, and the badge reads *End-to-end
+encrypted* once the group keys.
+
 ## Where things live
 
-- `web/src/core/` — the load-bearing parts: **transport** (mesh + the `Transport` interface),
-  **media** capture, **rooms**, the **plugin host**, **crypto**. UI code depends on these;
-  they don't depend on UI.
+- `web/src/core/` — the load-bearing parts: **transport** (mesh + `PionTransport` behind the
+  `Transport` interface), **media** capture + the media-plugin host, **rooms**, the **plugin
+  host**, **crypto** (MLS coordinator + frame cipher). UI code depends on these; they don't
+  depend on UI.
 - `web/src/features/` — the room UI: stage/layout, control bar, panels, pre-join, home.
-- `web/src/plugins/` — first-party plugins (reactions, chat). New user-facing features usually
-  go here.
+- `web/src/plugins/` — first-party plugins (reactions, chat, background effects, noise gate),
+  each on the public API only. New user-facing features usually go here.
+- `web/e2e/` — the headless-browser E2EE test (Playwright).
 - `web/src/design/` — design tokens, primitives, icons. Colors/spacing/motion come from here.
 - `worker/`, `selfhost/`, `crypto/` — signalling, the self-hosted SFU, and E2EE key agreement.
 

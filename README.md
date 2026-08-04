@@ -43,12 +43,14 @@ holds membership in memory — no storage of any kind. From there, media takes o
 paths behind a single [`Transport`](web/src/core/transport/Transport.ts) interface, so the
 UI never knows or cares which is active:
 
-- **Mesh (today):** small calls connect **peer-to-peer**. This is end-to-end encrypted by
+- **Mesh (default):** small calls connect **peer-to-peer**. This is end-to-end encrypted by
   construction — WebRTC's DTLS-SRTP runs between browsers and no middlebox exists to trust.
-- **SFU (built, being wired):** larger calls forward through a **selective forwarding unit**
-  (Cloudflare Realtime, or the self-hosted Go SFU), which every client uploads to once. The
-  SFU is kept blind by **frame-level encryption** — AES-GCM keyed by an **MLS** group secret
-  (OpenMLS, compiled to WASM), applied via insertable streams.
+- **SFU (self-hosted path wired):** larger calls forward through a **selective forwarding
+  unit** — every client uploads once. The self-hosted **Go + Pion SFU** (`selfhost/`) is wired
+  into the app today (opt in with `?sfu=1`) and kept blind by **frame-level encryption**:
+  AES-GCM keyed by an **MLS** group secret (OpenMLS → WASM), applied via insertable streams, so
+  it forwards ciphertext it can't read. The hosted **Cloudflare Realtime** path reuses the
+  identical crypto and is next.
 
 The whole hosted stack targets Cloudflare's **free tier** — there is no purchased server.
 Read [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full picture, including why an
@@ -56,25 +58,33 @@ SFU can't run *inside* a Worker and what that implies.
 
 ## Status
 
-Roughly Phases 1–2 of the [roadmap](docs/ROADMAP.md) are **shipped**; Phases 3–6 exist as
-**built, compiling foundations** not yet wired into a live call.
+Phases 1–2 of the [roadmap](docs/ROADMAP.md) are **shipped**, and the **self-hosted SFU path
+is wired end-to-end, including its E2EE**. The remaining big piece is the hosted **Cloudflare
+Realtime** transport (Phase 3), which needs a deploy.
 
 - ✅ **Real mesh calls** — camera/mic + device switching, one Durable Object per room over
   WebSocket hibernation, friendly room ids + shareable links, host **lobby** (admit / deny /
   remove / end), **screen share**, **reconnection** (grace window + host reclaim), STUN and
   optional Cloudflare **TURN**.
-- ✅ **Plugin system** — a capability-gated host with UI slots + E2EE data topics.
-  **Reactions** and **chat** are first-party plugins ([authoring guide](docs/PLUGIN-AUTHORING.md)).
-- ✅ **On-device effects** — background **blur** and **image replace** (MediaPipe, bundled,
-  no CDN), plus **active-speaker** detection, **pin-to-screen**, an **activity log**,
-  keyboard shortcuts, and fullscreen.
-- 🏗️ **Scale & sovereignty foundations** — the `Transport` interface, a self-hosted **Go +
-  Pion SFU** (`selfhost/`), and **MLS/OpenMLS → WASM** + a frame encryptor (`crypto/`,
-  `web/src/core/crypto/`). These compile and run standalone; wiring them into live SFU calls
-  is the next phase.
+- ✅ **Plugin system** — a capability-gated host with UI slots, E2EE data topics, and
+  `video`/`audio-transform` capabilities. **Reactions, chat, background effects, and a noise
+  gate** are all first-party plugins on the public API ([authoring guide](docs/PLUGIN-AUTHORING.md)).
+- ✅ **On-device effects** — background **blur / image replace / bundled gradients**
+  (MediaPipe, segmentation in a **Web Worker**, no CDN) and a **noise gate**, both plugins;
+  plus **active-speaker** detection, **pin-to-screen**, an **activity log**, keyboard
+  shortcuts, and fullscreen.
+- ✅ **Self-hosted SFU + E2EE over it** — `PionTransport` routes media through the **Go + Pion
+  SFU** while reusing the signalling DO for presence, and the **MLS/OpenMLS→WASM** coordinator
+  + frame encryptor make the SFU **blind to the media** (indicator reports `sfu-e2ee` once
+  keyed). The encryption is **verified** — unit tests, native MLS tests, a Go SFU test, and a
+  headless-Chromium test that proves frames actually encrypt/decrypt over live WebRTC (see
+  [Testing](#testing)).
+- ⏳ **Cloudflare Realtime transport** — the hosted at-scale path; reuses the same crypto,
+  needs a deploy to wire.
 
-The honest bottom line: **a complete, private, small-group video product today**, with the
-scaling and self-hosting machinery built and waiting to be connected.
+The honest bottom line: **a complete, private, small-group video product today**, plus a
+**self-hostable, end-to-end-encrypted SFU path** you can run and verify yourself with no
+Cloudflare account.
 
 ## Quick start
 
@@ -101,11 +111,28 @@ tab, **admit** them from the lobby. You're on a peer-to-peer, end-to-end-encrypt
 
 **Production build** (strict type-check + bundle): `cd web && bun run build`.
 
+## Testing
+
+The privacy-critical parts are covered by tests you can run yourself:
+
+```bash
+cd web && bun run test        # unit: frame cipher + MLS coordinator (loads the real OpenMLS WASM)
+cd web && bun run test:e2e    # headless Chromium: E2EE over live WebRTC (needs: npx playwright install chromium)
+cd selfhost && go test ./...  # SFU signalling contract
+cd crypto/mls && cargo test   # MLS group agreement + key rotation (native)
+```
+
+The browser test ([`web/e2e/`](web/e2e/README.md)) is the interesting one: it runs the real
+frame cipher over two live `RTCPeerConnection`s and asserts the correct key decrypts the video
+while a **wrong key can't** — proof the media is genuinely encrypted, not passed through. Run
+it whenever you change `web/src/core/crypto/` or the transport's E2EE wiring.
+
 ## The optional pieces
 
 - **Self-hosted SFU** — `cd selfhost && go run .` (see [`selfhost/README.md`](selfhost/README.md)).
-  A Go + Pion selective-forwarding unit with a bare test client, for anyone who won't trust a
-  hosted relay.
+  A Go + Pion selective-forwarding unit. To use it from the real app, run the worker + SFU +
+  web together and open the app with **`?sfu=1`** — media then flows through the SFU, E2EE, with
+  the full UI. Steps are in [`selfhost/README.md`](selfhost/README.md).
 - **MLS crypto** — `cd crypto/mls && ./build.sh` rebuilds the WASM module from Rust and
   vendors it into the web app (see [`crypto/README.md`](crypto/README.md)). Only needed if you
   change the Rust.
@@ -115,11 +142,12 @@ tab, **admit** them from the lobby. You're on a peer-to-peer, end-to-end-encrypt
 ```
 samvad/
 ├── web/               # React + TypeScript + Vite frontend  → Cloudflare Pages
-│   └── src/
-│       ├── core/      # transport, media, rooms, plugin host, crypto — the load-bearing parts
-│       ├── features/  # the room UI (stage, controls, panels, pre-join, home)
-│       ├── plugins/   # first-party plugins: reactions, chat
-│       └── design/    # design tokens, primitives, icons
+│   ├── src/
+│   │   ├── core/      # transport (mesh + Pion SFU), media, rooms, plugin host, crypto
+│   │   ├── features/  # the room UI (stage, controls, panels, pre-join, home)
+│   │   ├── plugins/   # first-party plugins: reactions, chat, background, noise
+│   │   └── design/    # design tokens, primitives, icons
+│   └── e2e/           # headless-browser E2EE test (Playwright)
 ├── worker/            # Cloudflare Worker + one Durable Object per room (signalling, /ice)
 ├── selfhost/          # Go + Pion self-hosted SFU (sovereignty exit)
 ├── crypto/            # MLS via OpenMLS, Rust → WASM (E2EE key agreement)

@@ -135,9 +135,14 @@ where scrutiny belongs, and where an external review is worth paying for before 
 
 ### Known gaps, v1
 
-- **Mesh calls (Phase 1) ship before MLS.** Until Phase 4, small calls rely on
-  DTLS-SRTP between peers — genuinely private, since no middlebox exists, but without MLS's
-  forward secrecy. The encryption indicator must say which mode is actually active
+- **Mesh calls use DTLS-SRTP, not MLS.** Small calls are peer-to-peer — genuinely private,
+  since no middlebox exists — but without MLS's forward secrecy; MLS runs on the **SFU path**,
+  where it's needed (the self-hosted SFU path has it today; the Cloudflare one reuses the same
+  crypto once deployed). The encryption indicator states which mode is actually active
+  (`mesh-e2ee` / `sfu-e2ee` / `hop-by-hop`)
+- **Plugin data over the SFU isn't E2EE yet.** Chat/reactions ride the P2P channel on mesh
+  (E2EE); on the SFU path they have no encrypted route yet, so they're currently disabled
+  there rather than sent in the clear
 - **Passphrase strength is the user's problem.** A weak passphrase is a weak room. The UI
   generates a strong one by default and resists users weakening it
 - **Removal is imperfect.** Rotating the key on leave stops future access, but a departed
