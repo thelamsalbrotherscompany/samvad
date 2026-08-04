@@ -71,8 +71,13 @@ Go is **not** needed for v1; it returns only for the optional self-hosted SFU.
 
 ## Current status
 
-Phases 1–2 shipped (real mesh calls, plugin system, on-device effects); Phases 3–6 exist as
-built, compiling foundations (the `Transport` interface, a self-hosted Go + Pion SFU in
-`selfhost/`, and MLS/OpenMLS→WASM + a frame encryptor in `crypto/`) not yet wired into live
-SFU calls. `docs/ROADMAP.md` is the source of truth for what's done — read it before
-assuming something is or isn't built.
+Phases 1–2 shipped (real mesh calls; effects/chat/reactions are all first-party plugins on
+the public API; background segmentation runs in a Web Worker). The **self-hosted SFU path is
+wired end-to-end**: `PionTransport` (opt in with `?sfu=1`) routes media through the Go + Pion
+SFU in `selfhost/` while reusing the signalling DO for presence, and **E2EE is live on it** —
+the built MLS/OpenMLS→WASM coordinator + frame encryptor attach over a DO data relay, so the
+SFU forwards ciphertext (indicator shows `sfu-e2ee` once keyed, honest `hop-by-hop` otherwise).
+Still open: the Cloudflare `RealtimeTransport` (Phase 3, needs deploy), plugin data + screen
+over the SFU, and the untrusted-plugin Worker sandbox. `docs/ROADMAP.md` is the source of truth
+— read it before assuming something is or isn't built. The self-hosted E2EE path needs the
+3-process local run (Chromium) to confirm end-to-end; see `selfhost/README.md`.
