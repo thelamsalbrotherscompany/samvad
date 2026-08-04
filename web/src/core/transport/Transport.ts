@@ -54,6 +54,8 @@ export type TransportHandlers = {
   onEncryption: (mode: EncryptionMode) => void
   /** The host asked everyone to mute — the app mutes this client's own mic. */
   onForceMute: () => void
+  /** The host cleared this client's raised hand — the app lowers it. */
+  onForceLower: () => void
 }
 
 /**
@@ -75,6 +77,8 @@ export interface Transport {
   kick(id: string): void
   /** Host: ask everyone else to mute their mic. */
   muteAll(): void
+  /** Host: ask a participant to lower their raised hand. */
+  lowerHand(id: string): void
   /** Host: hand the host role to another participant. */
   makeHost(id: string): void
   end(): void

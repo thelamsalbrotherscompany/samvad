@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { TooltipProvider } from '@/design/primitives'
 import { Stage, resolveStageView, type StageView, type ScreenShare } from '@/features/stage/Stage'
 import { TileActionsContext } from '@/features/stage/tileActions'
@@ -162,6 +162,8 @@ export default function App() {
     handRaised,
     // The host asked everyone to mute — honour it by muting our own mic.
     onForceMute: () => media.setMicOn(false),
+    // The host cleared our raised hand (e.g. after calling on us).
+    onForceLower: () => setHandRaised(false),
   })
   const phase = mesh.phase // 'connecting' | 'waiting' | 'admitted' | 'denied'
 
@@ -238,6 +240,28 @@ export default function App() {
   const raisedHands = withLiveState
     .filter((p) => p.handRaised)
     .map((p) => (p.isSelf ? 'You' : p.name))
+
+  // Ordered hand-raise queue: record when each hand went up (client-side) so the host can
+  // call on people in turn. Keyed on the set of raised ids, so it recomputes only on a change.
+  const raiseSeq = useRef(0)
+  const [raiseOrder, setRaiseOrder] = useState<Map<string, number>>(new Map())
+  const raisedSig = withLiveState
+    .filter((p) => p.handRaised)
+    .map((p) => p.id)
+    .sort()
+    .join(',')
+  useEffect(() => {
+    const raised = raisedSig ? raisedSig.split(',') : []
+    setRaiseOrder((prev) => {
+      const next = new Map(prev)
+      for (const id of raised) if (!next.has(id)) next.set(id, (raiseSeq.current += 1))
+      for (const id of [...next.keys()]) if (!raised.includes(id)) next.delete(id)
+      return next
+    })
+  }, [raisedSig])
+  const handQueue = withLiveState
+    .filter((p) => p.handRaised)
+    .sort((a, b) => (raiseOrder.get(a.id) ?? 0) - (raiseOrder.get(b.id) ?? 0))
 
   // Who's presenting, if anyone: a remote presenter takes the stage over your own
   // (you already know what you're sharing). When *you're* the presenter you get a
@@ -461,6 +485,8 @@ export default function App() {
             onRemove={mesh.kick}
             onMuteAll={mesh.muteAll}
             onMakeHost={mesh.makeHost}
+            handQueue={handQueue}
+            onLowerHand={mesh.lowerHand}
           />
         )}
 

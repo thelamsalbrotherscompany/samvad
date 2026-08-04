@@ -29,6 +29,8 @@ type Options = {
   handRaised: boolean
   /** Called when the host asks everyone to mute — the app mutes this client's own mic. */
   onForceMute: () => void
+  /** Called when the host clears this client's raised hand — the app lowers it. */
+  onForceLower: () => void
 }
 
 export type Mesh = {
@@ -47,6 +49,8 @@ export type Mesh = {
   kick: (id: string) => void
   /** Host: ask everyone else to mute their mic. */
   muteAll: () => void
+  /** Host: ask a participant to lower their raised hand. */
+  lowerHand: (id: string) => void
   /** Host: hand the host role to another participant. */
   makeHost: (id: string) => void
   end: () => void
@@ -79,6 +83,8 @@ export function useMesh(opts: Options): Mesh {
   // The force-mute callback, in a ref so the transport (wired once) always calls the current one.
   const onForceMuteRef = useRef(opts.onForceMute)
   onForceMuteRef.current = opts.onForceMute
+  const onForceLowerRef = useRef(opts.onForceLower)
+  onForceLowerRef.current = opts.onForceLower
 
   useEffect(() => {
     if (!opts.enabled) return
@@ -104,6 +110,7 @@ export function useMesh(opts: Options): Mesh {
       onActivity: (e: ActivityEvent) => setActivity((prev) => [...prev, e]),
       onEncryption: setEncryption,
       onForceMute: () => onForceMuteRef.current(),
+      onForceLower: () => onForceLowerRef.current(),
     }
     // Same constructor shape, so selection is the only line that knows the difference.
     const Ctor = opts.transport === 'sfu' ? PionTransport : MeshTransport
@@ -159,6 +166,7 @@ export function useMesh(opts: Options): Mesh {
   const setLobbyOpen = useCallback((open: boolean) => ref.current?.setLobbyOpen(open), [])
   const kick = useCallback((id: string) => ref.current?.kick(id), [])
   const muteAll = useCallback(() => ref.current?.muteAll(), [])
+  const lowerHand = useCallback((id: string) => ref.current?.lowerHand(id), [])
   const makeHost = useCallback((id: string) => ref.current?.makeHost(id), [])
   const end = useCallback(() => ref.current?.end(), [])
   const sendData = useCallback(
@@ -194,6 +202,7 @@ export function useMesh(opts: Options): Mesh {
     setLobbyOpen,
     kick,
     muteAll,
+    lowerHand,
     makeHost,
     end,
     sendData,

@@ -28,6 +28,10 @@ type Props = {
   onMuteAll?: () => void
   /** Host: hand the host role to another participant. */
   onMakeHost?: (id: string) => void
+  /** Raised hands, in the order they went up (the speaking queue). */
+  handQueue?: Participant[]
+  /** Host: clear a participant's raised hand (e.g. after calling on them). */
+  onLowerHand?: (id: string) => void
 }
 
 type Tab = 'people' | 'activity'
@@ -48,6 +52,8 @@ export function ParticipantsPanel({
   onRemove,
   onMuteAll,
   onMakeHost,
+  handQueue = [],
+  onLowerHand,
 }: Props) {
   const [tab, setTab] = useState<Tab>('people')
   const [query, setQuery] = useState('')
@@ -126,6 +132,37 @@ export function ParticipantsPanel({
                   <MicOffIcon className="size-4" />
                   Mute everyone
                 </button>
+              )}
+
+              {handQueue.length > 0 && (
+                <div className="mt-4 rounded-xl border border-line bg-surface-2/40 p-3">
+                  <div className="mb-2 flex items-center gap-1.5 text-[12px] font-medium tracking-wide text-ink-faint uppercase">
+                    <HandIcon className="size-3.5 text-accent" />
+                    Raised hands · {handQueue.length}
+                  </div>
+                  <div className="space-y-1">
+                    {handQueue.map((p, i) => (
+                      <div key={p.id} className="flex items-center gap-2.5">
+                        <span className="grid size-5 shrink-0 place-items-center rounded-full bg-accent/15 text-[11px] font-semibold text-accent tabular-nums">
+                          {i + 1}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-[13px] text-ink">
+                          {p.isSelf ? 'You' : p.name}
+                        </span>
+                        {isHost && onLowerHand && (
+                          <button
+                            onClick={() => onLowerHand(p.id)}
+                            aria-label={`Lower ${p.isSelf ? 'your' : p.name + '’s'} hand`}
+                            title="Lower hand"
+                            className="grid size-7 shrink-0 place-items-center rounded-full text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
+                          >
+                            <CloseIcon className="size-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
 
               <div className="relative mt-4 shrink-0">

@@ -207,6 +207,11 @@ export class MeshTransport implements Transport {
     this.sendToServer({ type: 'mute-all' })
   }
 
+  /** Host: ask a participant to lower their raised hand. */
+  lowerHand(id: string): void {
+    this.sendToServer({ type: 'lower-hand', id })
+  }
+
   /** Host: hand the host role to another participant. */
   makeHost(id: string): void {
     this.sendToServer({ type: 'make-host', id })
@@ -339,6 +344,10 @@ export class MeshTransport implements Transport {
 
       case 'force-mute':
         this.handlers.onForceMute()
+        break
+
+      case 'force-lower':
+        this.handlers.onForceLower()
         break
 
       case 'ended':

@@ -179,6 +179,14 @@ export class RoomDO {
         break
       }
 
+      case 'lower-hand': {
+        if (ws !== this.hostSocket()) return
+        const target = this.socketById(msg.id)
+        const ta = target ? this.attachmentOf(target) : null
+        if (target && ta?.status === 'admitted') this.send(target, { type: 'force-lower' })
+        break
+      }
+
       case 'make-host': {
         if (ws !== this.hostSocket()) return
         const target = this.socketById(msg.id)

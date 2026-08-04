@@ -40,6 +40,7 @@ export type ClientMessage =
   | { type: 'set-lobby'; open: boolean }
   | { type: 'kick'; id: string }
   | { type: 'mute-all' } // host only: ask every other admitted participant to mute
+  | { type: 'lower-hand'; id: string } // host only: ask a participant to lower their hand
   | { type: 'make-host'; id: string } // host only: hand the host role to another participant
   | { type: 'end' }
 
@@ -50,6 +51,7 @@ export type ServerMessage =
   | { type: 'denied' }
   | { type: 'kicked' }
   | { type: 'force-mute' } // the host asked everyone to mute; the client mutes its own mic
+  | { type: 'force-lower' } // the host cleared your raised hand; lower it locally
   | { type: 'ended' }
   | { type: 'not-found' }
   | { type: 'lobby'; open: boolean }

@@ -53,6 +53,7 @@ export type ClientMessage =
   | { type: 'set-lobby'; open: boolean } // host only: open = anyone with the link joins
   | { type: 'kick'; id: string } // host only
   | { type: 'mute-all' } // host only: ask every other admitted participant to mute their mic
+  | { type: 'lower-hand'; id: string } // host only: ask a participant to lower their raised hand
   | { type: 'make-host'; id: string } // host only: hand the host role to another participant
   | { type: 'end' } // host only: close the room for everyone
 
@@ -70,6 +71,8 @@ export type ServerMessage =
   // The host asked everyone to mute — the client mutes its own mic (a request it honours,
   // never a server reaching into your hardware).
   | { type: 'force-mute' }
+  // The host cleared your raised hand (e.g. after calling on you) — lower it locally.
+  | { type: 'force-lower' }
   // The host ended the meeting for everyone; your socket will close.
   | { type: 'ended' }
   // You tried to join a room that doesn't exist (no one has created it); socket closes.

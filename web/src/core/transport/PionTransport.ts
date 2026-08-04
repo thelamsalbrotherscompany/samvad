@@ -193,6 +193,10 @@ export class PionTransport implements Transport {
       case 'force-mute':
         this.handlers.onForceMute()
         break
+
+      case 'force-lower':
+        this.handlers.onForceLower()
+        break
       case 'ended':
         this.terminated = true
         this.handlers.onPhase('ended')
@@ -492,6 +496,10 @@ export class PionTransport implements Transport {
 
   muteAll(): void {
     this.sendToServer({ type: 'mute-all' })
+  }
+
+  lowerHand(id: string): void {
+    this.sendToServer({ type: 'lower-hand', id })
   }
 
   makeHost(id: string): void {
