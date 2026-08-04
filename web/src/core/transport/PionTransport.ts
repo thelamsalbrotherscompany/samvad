@@ -40,6 +40,11 @@ export class PionTransport implements Transport {
   private sfuWs: WebSocket | null = null
   private pc: RTCPeerConnection | null = null
   private sfuStarted = false
+  // We can only publish at connect time (the SFU is the sole offerer, so no adding m-lines
+  // later). If we're admitted before the camera is ready — which the host is, admitted
+  // instantly with no lobby wait — defer the SFU connection until media arrives.
+  private wantSfu = false
+  private sfuStartTimer: ReturnType<typeof setTimeout> | null = null
   /** All our published tracks live on this one stream, so they share an msid we can rewrite. */
   private readonly publishStream = new MediaStream()
 
@@ -166,8 +171,9 @@ export class PionTransport implements Transport {
         this.handlers.onHost(msg.isHost)
         this.handlers.onLobbyOpen(msg.lobbyOpen)
         for (const peer of msg.peers) this.addPeer(peer)
-        // We're in — bring media (and its E2EE) up against the SFU.
-        this.startSfu()
+        // We're in — bring media (and its E2EE) up against the SFU, once the camera is ready.
+        this.wantSfu = true
+        this.maybeStartSfu()
         break
 
       case 'waiting':
@@ -239,6 +245,28 @@ export class PionTransport implements Transport {
   }
 
   // ── SFU media ───────────────────────────────────────────────────────────────────
+
+  /**
+   * Connect to the SFU once we have tracks to publish. If the camera still isn't ready after
+   * a short grace, connect anyway (view-only) rather than hang. The SFU is the sole offerer,
+   * so whatever we publish here is all we can publish for this connection.
+   */
+  private maybeStartSfu(): void {
+    if (!this.wantSfu || this.sfuStarted) return
+    const hasTracks = (this.localStream?.getTracks().length ?? 0) > 0
+    if (hasTracks) {
+      if (this.sfuStartTimer) {
+        clearTimeout(this.sfuStartTimer)
+        this.sfuStartTimer = null
+      }
+      this.startSfu()
+    } else if (!this.sfuStartTimer) {
+      this.sfuStartTimer = setTimeout(() => {
+        this.sfuStartTimer = null
+        if (this.wantSfu && !this.sfuStarted) this.startSfu()
+      }, 3000)
+    }
+  }
 
   private startSfu(): void {
     if (this.sfuStarted) return
@@ -371,6 +399,10 @@ export class PionTransport implements Transport {
 
   private teardownMedia(): void {
     this.sfuStarted = false
+    if (this.sfuStartTimer) {
+      clearTimeout(this.sfuStartTimer)
+      this.sfuStartTimer = null
+    }
     if (this.encryptionTimer) {
       clearInterval(this.encryptionTimer)
       this.encryptionTimer = null
@@ -397,7 +429,11 @@ export class PionTransport implements Transport {
   setLocalStream(stream: MediaStream | null): void {
     this.localStream = stream
     const pc = this.pc
-    if (!pc) return
+    if (!pc) {
+      // Not connected yet — the camera may have just become ready, so try to start now.
+      this.maybeStartSfu()
+      return
+    }
     const senders = pc.getSenders()
     for (const track of stream?.getTracks() ?? []) {
       const sender = senders.find((s) => s.track?.kind === track.kind)
@@ -461,6 +497,7 @@ export class PionTransport implements Transport {
   leave(): void {
     this.leaving = true
     this.closed = true
+    this.wantSfu = false
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer)
       this.reconnectTimer = null

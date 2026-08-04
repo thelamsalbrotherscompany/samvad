@@ -40,10 +40,30 @@ PW_EXECUTABLE=/path/to/chrome-headless-shell bun run test:e2e
 `src/core/transport/PionTransport.ts`. A green unit suite doesn't prove the browser pipeline
 still round-trips; this does.
 
-## What it does *not* cover
+## `sfu-integration.mjs` — the full app over the self-hosted SFU
 
-The full app through the self-hosted SFU (`PionTransport` + the Go SFU + the signalling
-Worker) — the msid correlation, real SFU forwarding, and the MLS handshake over the DO relay
-end-to-end. That needs the 3-process local run in `../../selfhost/README.md`. The pieces are
-each covered (crypto here + unit, MLS handshake in `E2eeSession.test.ts`, SFU in
-`selfhost/internal/sfu/sfu_test.go`); wiring them live is the manual step.
+Drives the **real app** with two headless clients (fake cameras) end-to-end: one hosts a
+"New meeting" on `?sfu=1`, the other joins and is admitted, and it asserts **both** show
+*End-to-end encrypted* with self+remote video flowing — i.e. media fans out through the Go
+SFU, the msid correlation attributes each remote correctly, and the MLS handshake over the DO
+relay keyed the cipher.
+
+Unlike the loopback, it needs the three processes running first:
+
+```sh
+cd worker   && bun run dev     # :8787
+cd selfhost && go run .        # :8088
+cd web      && bun run dev      # :5173
+# then, in web/:
+bun run test:e2e:sfu
+```
+
+It writes `e2e/sfu-host.png` / `e2e/sfu-guest.png` (git-ignored) as visual evidence. This is
+the automated version of the manual two-tab check in `../../selfhost/README.md`.
+
+## Coverage map
+
+Every layer of the E2EE-over-SFU path has a test: the cipher (`frameCrypto.test.ts` + the
+loopback here), the MLS handshake (`E2eeSession.test.ts`), MLS itself (`crypto/mls` cargo
+tests), the SFU signalling (`selfhost/internal/sfu/sfu_test.go`), and the whole thing wired
+together (`sfu-integration.mjs`).
