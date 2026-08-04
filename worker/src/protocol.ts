@@ -55,13 +55,26 @@ export type ClientMessage =
   | { type: 'mute-all' } // host only: ask every other admitted participant to mute their mic
   | { type: 'lower-hand'; id: string } // host only: ask a participant to lower their raised hand
   | { type: 'make-host'; id: string } // host only: hand the host role to another participant
+  // Host only: the room-wide stage. `spotlightId` features one person on everyone's stage (the
+  // presenter; null = follow the active speaker); `classroom` asks non-presenters to go
+  // audio-first (camera off) — a request each client honours, never a server touching hardware.
+  | { type: 'stage'; spotlightId: string | null; classroom: boolean }
   | { type: 'end' } // host only: close the room for everyone
 
 /** Durable Object → browser. */
 export type ServerMessage =
   // You're in. Sent to the host immediately, and to a guest once admitted. `lobbyOpen`
-  // reflects the room's current admission policy (relevant to the host's toggle).
-  | { type: 'welcome'; selfId: string; isHost: boolean; lobbyOpen: boolean; peers: PeerInfo[] }
+  // reflects the room's current admission policy; `spotlightId`/`classroom` hand a late
+  // joiner the room's current stage state so they land on the presenter, not a blank grid.
+  | {
+      type: 'welcome'
+      selfId: string
+      isHost: boolean
+      lobbyOpen: boolean
+      spotlightId: string | null
+      classroom: boolean
+      peers: PeerInfo[]
+    }
   // You're in the lobby; the host has been asked.
   | { type: 'waiting' }
   // The host declined; your socket will close.
@@ -85,6 +98,9 @@ export type ServerMessage =
   | { type: 'knock-cancelled'; id: string }
   // Your host status changed (e.g. the host left and you're now it).
   | { type: 'role'; isHost: boolean }
+  // The room-wide stage changed (see the client `stage`) — every client honours it: the
+  // presenter takes the featured slot, and non-presenters go audio-first under `classroom`.
+  | { type: 'stage'; spotlightId: string | null; classroom: boolean }
   | { type: 'peer-joined'; peer: PeerInfo }
   | { type: 'peer-left'; id: string }
   | { type: 'peer-state'; peer: PeerInfo }

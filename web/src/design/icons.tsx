@@ -25,7 +25,9 @@ import {
   MoreHorizontal,
   PhoneOff,
   Pin,
+  Presentation,
   Search,
+  Star,
   SendHorizontal,
   Settings,
   Smile,
@@ -55,6 +57,8 @@ export const SendIcon = SendHorizontal
 export const ReactIcon = Smile
 export const SearchIcon = Search
 export const PinIcon = Pin
+export const SpotlightIcon = Star
+export const PresentIcon = Presentation
 export const HandIcon = Hand
 export const HeadphonesIcon = Headphones
 export const LeaveIcon = PhoneOff

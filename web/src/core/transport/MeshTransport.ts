@@ -217,6 +217,20 @@ export class MeshTransport implements Transport {
     this.sendToServer({ type: 'make-host', id })
   }
 
+  /**
+   * Host: set the room-wide stage. The app speaks its own id space, so `'self'` maps to our DO
+   * id on the wire; every client maps it back (see {@link toLocalSpotlight}).
+   */
+  setStage(spotlightId: string | null, classroom: boolean): void {
+    const wire = spotlightId === 'self' ? this.selfId : spotlightId
+    this.sendToServer({ type: 'stage', spotlightId: wire, classroom })
+  }
+
+  /** Translate a wire spotlight id into the app's id space (`'self'` when it's us). */
+  private toLocalSpotlight(id: string | null): string | null {
+    return id && id === this.selfId ? 'self' : id
+  }
+
   /** Host: end the meeting for everyone. */
   end(): void {
     this.sendToServer({ type: 'end' })
@@ -316,6 +330,7 @@ export class MeshTransport implements Transport {
         this.handlers.onPhase('admitted')
         this.handlers.onHost(msg.isHost)
         this.handlers.onLobbyOpen(msg.lobbyOpen)
+        this.handlers.onStage(this.toLocalSpotlight(msg.spotlightId), msg.classroom)
         // P2P mesh has no middlebox — genuinely E2EE by construction.
         this.handlers.onEncryption('mesh-e2ee')
         // We're the newcomer: we call everyone already here. If we're mid-presentation
@@ -376,6 +391,10 @@ export class MeshTransport implements Transport {
 
       case 'role':
         this.handlers.onHost(msg.isHost)
+        break
+
+      case 'stage':
+        this.handlers.onStage(this.toLocalSpotlight(msg.spotlightId), msg.classroom)
         break
 
       case 'peer-joined':

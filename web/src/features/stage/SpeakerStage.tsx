@@ -23,11 +23,14 @@ export function SpeakerStage({
   participants,
   activeSpeakerId,
   screenShare,
+  spotlightId,
   controlsVisible = true,
 }: {
   participants: Participant[]
   activeSpeakerId: string | null
   screenShare?: ScreenShare | null
+  /** Host-spotlighted presenter (app id space: `'self'`, a peer id, or null). */
+  spotlightId?: string | null
   /** Controls are on screen — reserve room below the filmstrip so they don't cover it. */
   controlsVisible?: boolean
 }) {
@@ -54,9 +57,12 @@ export function SpeakerStage({
     )
   }
 
-  // A pinned person holds the feature; otherwise it follows the active speaker.
+  // Featured precedence: a local pin (your own choice) → the host's spotlight (the presenter,
+  // possibly you) → the active speaker → whoever's here. The spotlight is picked from everyone,
+  // since the presenter can be you; a pin only ever targets a peer.
   const featured =
     (pinnedId ? others.find((p) => p.id === pinnedId) : undefined) ??
+    (spotlightId ? participants.find((p) => p.id === spotlightId) : undefined) ??
     others.find((p) => p.id === activeSpeakerId) ??
     others[0] ??
     self ??
@@ -65,7 +71,9 @@ export function SpeakerStage({
 
   return (
     <Frame
-      featured={<ParticipantTile participant={featured} />}
+      featured={
+        <ParticipantTile participant={featured} spotlighted={featured.id === spotlightId} />
+      }
       rail={rail}
       self={self}
       showSelfPip={self !== undefined && featured.id !== self.id}

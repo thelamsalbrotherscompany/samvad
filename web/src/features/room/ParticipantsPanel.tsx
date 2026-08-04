@@ -8,6 +8,7 @@ import {
   RemoveUserIcon,
   SearchIcon,
   ShieldIcon,
+  SpotlightIcon,
   VideoOffIcon,
 } from '@/design/icons'
 import { initialsOf, type Participant } from '@/core/participants'
@@ -32,6 +33,14 @@ type Props = {
   handQueue?: Participant[]
   /** Host: clear a participant's raised hand (e.g. after calling on them). */
   onLowerHand?: (id: string) => void
+  /** Classroom (audio-first) mode is on. */
+  classroom?: boolean
+  /** Host: toggle classroom mode. */
+  onSetClassroom?: (on: boolean) => void
+  /** The spotlighted presenter's id (app id space: `'self'`, a peer id, or null). */
+  spotlightId?: string | null
+  /** Host: feature a participant for everyone (pass null to clear the spotlight). */
+  onSpotlight?: (id: string | null) => void
 }
 
 type Tab = 'people' | 'activity'
@@ -54,6 +63,10 @@ export function ParticipantsPanel({
   onMakeHost,
   handQueue = [],
   onLowerHand,
+  classroom,
+  onSetClassroom,
+  spotlightId,
+  onSpotlight,
 }: Props) {
   const [tab, setTab] = useState<Tab>('people')
   const [query, setQuery] = useState('')
@@ -125,6 +138,22 @@ export function ParticipantsPanel({
                 </div>
               )}
 
+              {isHost && onSetClassroom && (
+                <div className="mt-3 flex items-center justify-between gap-4 rounded-xl border border-line bg-surface-2/40 p-3.5">
+                  <div>
+                    <div className="text-[14px] text-ink">Classroom mode</div>
+                    <div className="text-[12px] text-ink-faint">
+                      Everyone but the presenter goes audio-first.
+                    </div>
+                  </div>
+                  <Toggle
+                    label="Classroom mode"
+                    checked={!!classroom}
+                    onCheckedChange={onSetClassroom}
+                  />
+                </div>
+              )}
+
               {isHost && onMuteAll && participants.length > 1 && (
                 <button
                   onClick={onMuteAll}
@@ -189,12 +218,33 @@ export function ParticipantsPanel({
                     <div className="min-w-0 flex-1 truncate text-[14px] text-ink">
                       {p.isSelf ? 'You' : p.name}
                       {p.isSelf && isHost && <span className="text-ink-faint"> · Host</span>}
+                      {spotlightId === p.id && <span className="text-accent"> · Presenter</span>}
                     </div>
                     <div className="flex items-center gap-1.5 text-ink-faint">
                       {p.handRaised && <HandIcon className="size-4 text-accent" />}
                       {p.muted && <MicOffIcon className="size-4" />}
                       {p.cameraOff && <VideoOffIcon className="size-4" />}
                     </div>
+                    {isHost && onSpotlight && (
+                      <button
+                        onClick={() => onSpotlight(spotlightId === p.id ? null : p.id)}
+                        aria-pressed={spotlightId === p.id}
+                        aria-label={
+                          spotlightId === p.id
+                            ? `Stop spotlighting ${p.isSelf ? 'yourself' : p.name}`
+                            : `Spotlight ${p.isSelf ? 'yourself' : p.name} for everyone`
+                        }
+                        title={spotlightId === p.id ? 'Stop presenting' : 'Spotlight'}
+                        className={cn(
+                          'grid size-8 shrink-0 place-items-center rounded-full transition-colors',
+                          spotlightId === p.id
+                            ? 'bg-accent text-base'
+                            : 'text-ink-faint hover:bg-surface-2 hover:text-accent',
+                        )}
+                      >
+                        <SpotlightIcon className="size-4" />
+                      </button>
+                    )}
                     {isHost && onMakeHost && !p.isSelf && (
                       <button
                         onClick={() => onMakeHost(p.id)}

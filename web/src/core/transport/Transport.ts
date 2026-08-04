@@ -56,6 +56,12 @@ export type TransportHandlers = {
   onForceMute: () => void
   /** The host cleared this client's raised hand — the app lowers it. */
   onForceLower: () => void
+  /**
+   * The room-wide stage changed. `spotlightId` is in the app's own id space — `'self'` when
+   * *you* are the presenter, a peer's id otherwise, or null for none — so the UI never sees a
+   * raw transport id. `classroom` asks non-presenters to go audio-first.
+   */
+  onStage: (spotlightId: string | null, classroom: boolean) => void
 }
 
 /**
@@ -81,6 +87,11 @@ export interface Transport {
   lowerHand(id: string): void
   /** Host: hand the host role to another participant. */
   makeHost(id: string): void
+  /**
+   * Host: set the room-wide stage. `spotlightId` features one person for everyone (`'self'` for
+   * the host themselves, a peer id, or null to clear); `classroom` toggles audio-first mode.
+   */
+  setStage(spotlightId: string | null, classroom: boolean): void
   end(): void
   /** Send plugin data on a topic — to the whole room or one peer. E2EE, never via server. */
   sendData(topic: string, payload: unknown, opts?: { to?: string }): void

@@ -170,6 +170,7 @@ export class PionTransport implements Transport {
         this.handlers.onPhase('admitted')
         this.handlers.onHost(msg.isHost)
         this.handlers.onLobbyOpen(msg.lobbyOpen)
+        this.handlers.onStage(this.toLocalSpotlight(msg.spotlightId), msg.classroom)
         for (const peer of msg.peers) this.addPeer(peer)
         // We're in — bring media (and its E2EE) up against the SFU, once the camera is ready.
         this.wantSfu = true
@@ -222,6 +223,10 @@ export class PionTransport implements Transport {
         this.handlers.onHost(msg.isHost)
         // The committer role follows the host — hand MLS over too.
         this.e2ee?.setHost(msg.isHost)
+        break
+
+      case 'stage':
+        this.handlers.onStage(this.toLocalSpotlight(msg.spotlightId), msg.classroom)
         break
 
       case 'peer-joined':
@@ -504,6 +509,17 @@ export class PionTransport implements Transport {
 
   makeHost(id: string): void {
     this.sendToServer({ type: 'make-host', id })
+  }
+
+  /** Host: set the room-wide stage. `'self'` maps to our DO id on the wire (see MeshTransport). */
+  setStage(spotlightId: string | null, classroom: boolean): void {
+    const wire = spotlightId === 'self' ? this.selfId : spotlightId
+    this.sendToServer({ type: 'stage', spotlightId: wire, classroom })
+  }
+
+  /** Translate a wire spotlight id into the app's id space (`'self'` when it's us). */
+  private toLocalSpotlight(id: string | null): string | null {
+    return id && id === this.selfId ? 'self' : id
   }
 
   end(): void {

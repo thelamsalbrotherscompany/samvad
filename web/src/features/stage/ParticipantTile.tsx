@@ -1,4 +1,4 @@
-import { MicOffIcon, HandIcon, PinIcon, RemoveUserIcon } from '@/design/icons'
+import { MicOffIcon, HandIcon, PinIcon, RemoveUserIcon, SpotlightIcon } from '@/design/icons'
 import { Hint } from '@/design/primitives'
 import { TILE_WASHES, initialsOf, type Participant } from '@/core/participants'
 import { VideoView } from '@/core/media/VideoView'
@@ -10,6 +10,8 @@ type Props = {
   participant: Participant
   /** Small tiles (filmstrip, PiP, dense grid) drop the name label. */
   compact?: boolean
+  /** This tile is the host-spotlighted presenter — mark it as such. */
+  spotlighted?: boolean
 }
 
 /**
@@ -18,7 +20,7 @@ type Props = {
  * width in the filmstrip. Internals scale to the tile via container-query units,
  * so one component looks right from a 96px thumbnail to a full-screen speaker.
  */
-export function ParticipantTile({ participant, compact = false }: Props) {
+export function ParticipantTile({ participant, compact = false, spotlighted = false }: Props) {
   const { name, isSelf, muted, cameraOff, speaking, handRaised, wash, stream, mirrored } =
     participant
   const initials = initialsOf(name)
@@ -93,6 +95,13 @@ export function ParticipantTile({ participant, compact = false }: Props) {
         {!compact && (
           <span className="truncate text-[13px] font-medium text-white drop-shadow-sm">
             {isSelf ? `You · ${name}` : name}
+          </span>
+        )}
+        {/* The presenter marker — honest about who the room is being asked to watch. */}
+        {spotlighted && !compact && (
+          <span className="ml-auto flex shrink-0 items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-[11px] font-semibold text-base">
+            <SpotlightIcon className="size-3" />
+            Presenter
           </span>
         )}
       </div>

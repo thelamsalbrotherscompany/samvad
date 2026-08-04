@@ -61,9 +61,35 @@ bun run test:e2e:sfu
 It writes `e2e/sfu-host.png` / `e2e/sfu-guest.png` (git-ignored) as visual evidence. This is
 the automated version of the manual two-tab check in `../../selfhost/README.md`.
 
+## `classroom.mjs` — presenter mode over the mesh
+
+Classroom presenter mode (host-controlled **spotlight** + **classroom / audio-first**) is a pure
+Durable-Object relay plus UI, so it behaves the same on every transport — which lets it be tested
+on the **mesh**, needing only two processes (no Go SFU):
+
+```sh
+cd worker && bun run dev     # :8787
+cd web    && bun run dev     # :5173
+# then, in web/:
+bun run test:e2e:classroom
+```
+
+Two headless clients (a host "Teacher" and a guest "Student") drive the real host controls and
+assert the stage state actually propagates: enabling **classroom mode** turns the non-presenter
+guest's *own* camera off (audio-first, honoured client-side — the server never touches hardware);
+**spotlighting** the guest shows a "Presenter" badge on both clients and the chrome pill; and the
+guest **leaving while spotlighted** self-clears the host's spotlight (no ghost presenter). Writes
+`e2e/classroom-host.png` (git-ignored).
+
+**Run it if you touch** the room-wide stage: `worker/src/room.ts` (the `stage` relay), the
+`setStage`/`onStage` wiring in either transport, or `src/features/stage/` and the presenter UI.
+
 ## Coverage map
 
 Every layer of the E2EE-over-SFU path has a test: the cipher (`frameCrypto.test.ts` + the
 loopback here), the MLS handshake (`E2eeSession.test.ts`), MLS itself (`crypto/mls` cargo
 tests), the SFU signalling (`selfhost/internal/sfu/sfu_test.go`), and the whole thing wired
 together (`sfu-integration.mjs`).
+
+Classroom presenter mode is covered by the pure layout contract (`stageView.test.ts`) and the
+end-to-end relay (`classroom.mjs`).

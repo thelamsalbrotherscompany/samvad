@@ -6,6 +6,11 @@ type Attachment = PeerInfo & {
   status: Status
   admittedAt: number
   lobbyOpen: boolean
+  // Room-wide stage state — meaningful only on the host's attachment (like lobbyOpen), read
+  // via {@link RoomDO.currentStage}. Stored on the attachment (not instance memory) so it
+  // survives hibernation, and carried forward on host handoff/reclaim.
+  spotlightId: string | null
+  classroom: boolean
   session: string
   /** Set on a deliberate leave, so the close handler doesn't hold a grace spot. */
   departed: boolean
@@ -15,6 +20,9 @@ type Attachment = PeerInfo & {
 type Grace = PeerInfo & {
   admittedAt: number
   lobbyOpen: boolean
+  // Preserve a host's stage across a brief drop, so a reclaim restores classroom/spotlight.
+  spotlightId: string | null
+  classroom: boolean
   expiresAt: number
 }
 
@@ -57,6 +65,8 @@ export class RoomDO {
       status: 'connected',
       admittedAt: 0,
       lobbyOpen: false,
+      spotlightId: null,
+      classroom: false,
       session: '',
       departed: false,
     }
@@ -106,6 +116,8 @@ export class RoomDO {
             selfId: self.id,
             isHost: true,
             lobbyOpen: self.lobbyOpen,
+            spotlightId: self.spotlightId,
+            classroom: self.classroom,
             peers: [],
           })
         } else if (this.attachmentOf(host)?.lobbyOpen) {
@@ -199,9 +211,35 @@ export class RoomDO {
           if (a) earliest = Math.min(earliest, a.admittedAt)
         }
         ta.admittedAt = earliest - 1
+        // The room-wide stage lives on the host's attachment — hand it over with the role, so
+        // a deliberate handoff doesn't silently drop classroom mode or the spotlight.
+        ta.spotlightId = self.spotlightId
+        ta.classroom = self.classroom
+        self.spotlightId = null
+        self.classroom = false
+        ws.serializeAttachment(self)
         target.serializeAttachment(ta)
         this.send(target, { type: 'role', isHost: true })
         this.send(ws, { type: 'role', isHost: false })
+        break
+      }
+
+      case 'stage': {
+        if (ws !== this.hostSocket()) return
+        // Only spotlight someone actually in the room (or clear it); a stale id would strand
+        // every client on a presenter who isn't there.
+        const target = msg.spotlightId ? this.socketById(msg.spotlightId) : null
+        const valid = !msg.spotlightId || this.attachmentOf(target ?? undefined)?.status === 'admitted'
+        self.spotlightId = valid ? msg.spotlightId : null
+        self.classroom = msg.classroom
+        ws.serializeAttachment(self)
+        const out: ServerMessage = {
+          type: 'stage',
+          spotlightId: self.spotlightId,
+          classroom: self.classroom,
+        }
+        this.send(ws, out)
+        this.broadcastAdmitted(ws, out)
         break
       }
 
@@ -288,11 +326,14 @@ export class RoomDO {
   private admitAndAnnounce(ws: WebSocket, self: Attachment): void {
     this.admit(ws, self)
     const peers = this.roster().filter((p) => p.id !== self.id)
+    const stage = this.currentStage()
     this.send(ws, {
       type: 'welcome',
       selfId: self.id,
       isHost: this.hostSocket() === ws,
       lobbyOpen: this.currentLobbyOpen(),
+      spotlightId: stage.spotlightId,
+      classroom: stage.classroom,
       peers,
     })
     this.broadcastAdmitted(ws, { type: 'peer-joined', peer: publicInfo(self) })
@@ -306,16 +347,22 @@ export class RoomDO {
     self.id = grace.id
     self.admittedAt = grace.admittedAt
     self.lobbyOpen = grace.lobbyOpen
+    // Restore the host's stage (classroom/spotlight) the drop was holding.
+    self.spotlightId = grace.spotlightId
+    self.classroom = grace.classroom
     self.status = 'admitted'
     ws.serializeAttachment(self)
 
     const peers = this.roster().filter((p) => p.id !== self.id)
     const isHost = this.hostSocket() === ws
+    const stage = this.currentStage()
     this.send(ws, {
       type: 'welcome',
       selfId: self.id,
       isHost,
       lobbyOpen: this.currentLobbyOpen(),
+      spotlightId: stage.spotlightId,
+      classroom: stage.classroom,
       peers,
     })
     this.broadcastAdmitted(ws, { type: 'peer-joined', peer: publicInfo(self) })
@@ -343,6 +390,8 @@ export class RoomDO {
           sharing: self.sharing,
           admittedAt: self.admittedAt,
           lobbyOpen: self.lobbyOpen,
+          spotlightId: self.spotlightId,
+          classroom: self.classroom,
           expiresAt: Date.now() + GRACE_MS,
         })
       }
@@ -358,7 +407,32 @@ export class RoomDO {
     if (host && host !== ws) {
       this.send(host, { type: 'role', isHost: true })
       for (const peer of this.pendingPeers()) this.send(host, { type: 'knock', peer })
+      // If the host is the one leaving, hand its stage state to the new host, so classroom
+      // mode / the spotlight survive the handoff (matches make-host and reclaim).
+      if (self.spotlightId != null || self.classroom) {
+        const ha = this.attachmentOf(host)
+        if (ha) {
+          ha.spotlightId = self.spotlightId
+          ha.classroom = self.classroom
+          host.serializeAttachment(ha)
+        }
+      }
     }
+    // If the person leaving was the spotlighted presenter, clear the spotlight room-wide so no
+    // one is left featuring a ghost. (Reads the host *after* any handoff above.)
+    this.clearSpotlightIfLeft(self.id, ws)
+  }
+
+  /** Clear + broadcast the spotlight if it points at someone who has now left. */
+  private clearSpotlightIfLeft(leftId: string, exclude: WebSocket): void {
+    const host = this.hostSocket(exclude)
+    const ha = this.attachmentOf(host)
+    if (!host || !ha || ha.spotlightId !== leftId) return
+    ha.spotlightId = null
+    host.serializeAttachment(ha)
+    const out: ServerMessage = { type: 'stage', spotlightId: null, classroom: ha.classroom }
+    this.send(host, out)
+    this.broadcastAdmitted(host, out)
   }
 
   private cancelKnock(self: Attachment): void {
@@ -377,6 +451,12 @@ export class RoomDO {
 
   private currentLobbyOpen(): boolean {
     return !!this.attachmentOf(this.hostSocket())?.lobbyOpen
+  }
+
+  /** The room-wide stage, read off the host's attachment (its single source of truth). */
+  private currentStage(): { spotlightId: string | null; classroom: boolean } {
+    const host = this.attachmentOf(this.hostSocket())
+    return { spotlightId: host?.spotlightId ?? null, classroom: host?.classroom ?? false }
   }
 
   private sockets(): WebSocket[] {

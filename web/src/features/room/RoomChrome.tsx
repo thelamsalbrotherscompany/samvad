@@ -1,4 +1,12 @@
-import { CheckIcon, CopyIcon, HandIcon, ShareIcon, ShieldIcon, UsersIcon } from '@/design/icons'
+import {
+  CheckIcon,
+  CopyIcon,
+  HandIcon,
+  PresentIcon,
+  ShareIcon,
+  ShieldIcon,
+  UsersIcon,
+} from '@/design/icons'
 import { Hint } from '@/design/primitives'
 import { useCopyLink } from '@/lib/useCopyLink'
 import { cn } from '@/lib/cn'
@@ -15,6 +23,10 @@ type Props = {
    * genuinely E2EE; SFU calls only become so in Phase 4 — see docs/THREAT-MODEL.md.
    */
   encryption: 'mesh-e2ee' | 'sfu-e2ee' | 'hop-by-hop'
+  /** Classroom (audio-first) mode is on for the room. */
+  classroom?: boolean
+  /** The current presenter's display name, if the host spotlighted someone. */
+  presenterName?: string | null
 }
 
 const ENCRYPTION_COPY = {
@@ -30,11 +42,19 @@ export function RoomChrome({
   onShare,
   raisedHands,
   encryption,
+  classroom,
+  presenterName,
 }: Props) {
   const { copied, copy: copyLink } = useCopyLink(roomName)
   const secure = encryption !== 'hop-by-hop'
   const copy = ENCRYPTION_COPY[encryption]
   const hands = raisedHands.length
+  // A presenter is the sharper signal; classroom mode alone (no spotlight) still says so.
+  const stageLabel = presenterName
+    ? `${presenterName} presenting`
+    : classroom
+      ? 'Classroom mode'
+      : null
 
   return (
     <div
@@ -94,6 +114,24 @@ export function RoomChrome({
       </div>
 
       <div className="flex items-center gap-2">
+        {/* Classroom / presenter state — quietly present so the room mode is never a surprise.
+            Icon-only on a phone, so it's named and announced. */}
+        {stageLabel && (
+          <Hint label={stageLabel}>
+            <div
+              role="status"
+              aria-live="polite"
+              aria-label={stageLabel}
+              className="flex items-center gap-1.5 rounded-full border border-accent/25 bg-accent/10 px-3 py-1.5 text-accent backdrop-blur-2xl"
+            >
+              <PresentIcon className="size-4 shrink-0" />
+              <span className="hidden max-w-36 truncate text-[13px] font-medium sm:inline">
+                {stageLabel}
+              </span>
+            </div>
+          </Hint>
+        )}
+
         <div className="flex items-center gap-1.5 rounded-full border border-line/80 bg-surface/80 px-3 py-1.5 backdrop-blur-2xl">
           <UsersIcon className="size-4 text-ink-muted" />
           <span className="text-[13px] font-medium tabular-nums">{count}</span>

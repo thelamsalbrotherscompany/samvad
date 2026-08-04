@@ -38,6 +38,13 @@ export type Mesh = {
   phase: Phase
   isHost: boolean
   lobbyOpen: boolean
+  /**
+   * The presenter featured on everyone's stage (host-set): `'self'` when it's you, a peer id,
+   * or null. In the app's own id space — the transport translates our DO id to `'self'`.
+   */
+  spotlightId: string | null
+  /** Classroom mode: non-presenters are audio-first (camera off, honoured client-side). */
+  classroom: boolean
   /** The real encryption mode of the media path, straight from the transport. */
   encryption: EncryptionMode
   peers: RemotePeer[]
@@ -53,6 +60,10 @@ export type Mesh = {
   lowerHand: (id: string) => void
   /** Host: hand the host role to another participant. */
   makeHost: (id: string) => void
+  /** Host: feature a participant on everyone's stage (`'self'`, a peer id, or null to clear). */
+  setSpotlight: (id: string | null) => void
+  /** Host: turn classroom (audio-first) mode on or off. */
+  setClassroom: (on: boolean) => void
   end: () => void
   /** Send plugin data on a topic (whole room, or one peer). E2EE, P2P. */
   sendData: (topic: string, payload: unknown, opts?: { to?: string }) => void
@@ -72,8 +83,16 @@ export function useMesh(opts: Options): Mesh {
   const [phase, setPhase] = useState<Phase>('connecting')
   const [isHost, setIsHost] = useState(false)
   const [lobbyOpen, setLobbyOpenState] = useState(false)
+  const [spotlightId, setSpotlightIdState] = useState<string | null>(null)
+  const [classroom, setClassroomState] = useState(false)
   const [encryption, setEncryption] = useState<EncryptionMode>('hop-by-hop')
   const [activity, setActivity] = useState<ActivityEvent[]>([])
+  // Current stage in refs, so setSpotlight/setClassroom (stable callbacks) always send the
+  // *other* half of the stage state unchanged rather than a stale closure value.
+  const spotlightRef = useRef<string | null>(null)
+  spotlightRef.current = spotlightId
+  const classroomRef = useRef(false)
+  classroomRef.current = classroom
   // Typed to the interface, not the concrete class: the app is transport-agnostic, so a
   // future RealtimeTransport / PionTransport drops in here with no UI changes.
   const ref = useRef<Transport | null>(null)
@@ -111,6 +130,10 @@ export function useMesh(opts: Options): Mesh {
       onEncryption: setEncryption,
       onForceMute: () => onForceMuteRef.current(),
       onForceLower: () => onForceLowerRef.current(),
+      onStage: (id: string | null, cls: boolean) => {
+        setSpotlightIdState(id)
+        setClassroomState(cls)
+      },
     }
     // Same constructor shape, so selection is the only line that knows the difference.
     const Ctor = opts.transport === 'sfu' ? PionTransport : MeshTransport
@@ -135,6 +158,8 @@ export function useMesh(opts: Options): Mesh {
       setPhase('connecting')
       setIsHost(false)
       setLobbyOpenState(false)
+      setSpotlightIdState(null)
+      setClassroomState(false)
       setEncryption('hop-by-hop')
     }
     // Identity/stream are pushed via their own effects — not deps here, so muting
@@ -168,6 +193,15 @@ export function useMesh(opts: Options): Mesh {
   const muteAll = useCallback(() => ref.current?.muteAll(), [])
   const lowerHand = useCallback((id: string) => ref.current?.lowerHand(id), [])
   const makeHost = useCallback((id: string) => ref.current?.makeHost(id), [])
+  // Each setter sends the full stage, carrying the *other* half through unchanged.
+  const setSpotlight = useCallback(
+    (id: string | null) => ref.current?.setStage(id, classroomRef.current),
+    [],
+  )
+  const setClassroom = useCallback(
+    (on: boolean) => ref.current?.setStage(spotlightRef.current, on),
+    [],
+  )
   const end = useCallback(() => ref.current?.end(), [])
   const sendData = useCallback(
     (topic: string, payload: unknown, opts?: { to?: string }) =>
@@ -193,6 +227,8 @@ export function useMesh(opts: Options): Mesh {
     phase,
     isHost,
     lobbyOpen,
+    spotlightId,
+    classroom,
     encryption,
     peers,
     knocks,
@@ -204,6 +240,8 @@ export function useMesh(opts: Options): Mesh {
     muteAll,
     lowerHand,
     makeHost,
+    setSpotlight,
+    setClassroom,
     end,
     sendData,
     subscribeData,

@@ -195,7 +195,19 @@ confirm end-to-end — see `selfhost/README`.)*
 
 ## Phase 5 — Classroom scale
 
-- ⏳ Classroom mode: one presenter publishes video; participants are audio-first
+- ✅ **Classroom mode: one presenter, everyone else audio-first** — a host-controlled, room-wide
+  **stage** relayed by the DO (`{type:'stage'}`, RAM only): a **spotlight** features one person on
+  *everyone's* stage (the presenter — distinct from the local-only pin), and **classroom mode**
+  asks non-presenters to go audio-first. Audio-first is honoured **client-side** — a non-presenter
+  turns its *own* camera off, exactly like mute-all; the server never touches hardware, and you can
+  turn it back on. The spotlight can be the host or any participant (call on a raised hand, they
+  take the stage), lives on the host's attachment so it survives hibernation, **carries across host
+  handoff / reconnect**, and **self-clears when the presenter leaves** (no ghost on stage). Both
+  transports relay it unchanged — the UI never learns which. An always-visible chrome pill and a
+  per-tile "Presenter" badge keep the mode honest. The layout contract (spotlight defaults everyone
+  to speaker-focus, but an explicit grid choice still wins) is unit-tested in `stageView.test.ts`.
+  ⏳ *Still open:* on the SFU, non-presenter video could be dropped at the source (subscribe-to-
+  visible) rather than only camera-off — a bandwidth win that wants the SFU's Phase 3 work
 - ✅ **Hand-raise, speaking queue, presenter handoff** — hand-raise + an **ordered queue** the
   host works through (with host lower-hand), and **presenter handoff** (transfer the host role,
   which on the SFU also transfers the MLS committer). Both are host→DO commands, so they work on

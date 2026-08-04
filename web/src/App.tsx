@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { TooltipProvider } from '@/design/primitives'
-import { Stage, resolveStageView, type StageView, type ScreenShare } from '@/features/stage/Stage'
+import { Stage, type ScreenShare } from '@/features/stage/Stage'
+import { resolveStageView, type StageView } from '@/features/stage/stageView'
 import { TileActionsContext } from '@/features/stage/tileActions'
 import { ControlBar } from '@/features/room/ControlBar'
 import { RoomChrome } from '@/features/room/RoomChrome'
@@ -185,6 +186,19 @@ export default function App() {
     if (pinnedId && !mesh.peers.some((p) => p.id === pinnedId)) setPinnedId(null)
   }, [pinnedId, mesh.peers])
 
+  // Classroom mode → audio-first: when it switches on (or you join with it already on) and
+  // you're not the presenter, turn your camera off. It's a request we honour on our own
+  // hardware — exactly like force-mute — never the server reaching in, and you can turn the
+  // camera back on if you truly need to show something.
+  const prevClassroom = useRef(false)
+  useEffect(() => {
+    const amPresenter = mesh.isHost || mesh.spotlightId === 'self'
+    if (mesh.classroom && !prevClassroom.current && !amPresenter) media.setCameraOn(false)
+    prevClassroom.current = mesh.classroom
+    // media.setCameraOn is stable; we intentionally react only to the stage signal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mesh.classroom, mesh.isHost, mesh.spotlightId])
+
   // You, real.
   const selfParticipant: Participant = {
     id: 'self',
@@ -269,6 +283,15 @@ export default function App() {
   // the captured surface is what creates the infinite feedback tunnel (and it's
   // pointless: it's your screen, right in front of you). Viewers still get the real
   // stream; theirs may lag the `sharing` flag, so the tile placeholders until it lands.
+  // The host-spotlighted presenter's name, for the honest "who's presenting" chrome pill.
+  // spotlightId is the app's own id space: 'self' → you, else a peer.
+  const presenterName =
+    mesh.spotlightId == null
+      ? null
+      : mesh.spotlightId === 'self'
+        ? 'You'
+        : (mesh.peers.find((p) => p.id === mesh.spotlightId)?.name ?? null)
+
   const remoteSharer = mesh.peers.find((p) => p.sharing)
   const screenShare: ScreenShare | null = remoteSharer
     ? { presenterName: remoteSharer.name, stream: remoteSharer.screenStream }
@@ -278,7 +301,14 @@ export default function App() {
 
   // The layout actually on screen. The toggle flips this, so pressing it always
   // changes what the user sees — never a hidden preference that already matched.
-  const layout = resolveStageView(view, narrow, participantCount, screenShare, pinnedId != null)
+  const layout = resolveStageView(
+    view,
+    narrow,
+    participantCount,
+    screenShare,
+    pinnedId != null,
+    mesh.spotlightId != null,
+  )
 
   return (
     <TooltipProvider>
@@ -360,6 +390,7 @@ export default function App() {
                   view={view}
                   screenShare={screenShare}
                   pinnedId={pinnedId}
+                  spotlightId={mesh.spotlightId}
                   controlsVisible={chromeVisible}
                 />
               )}
@@ -389,6 +420,8 @@ export default function App() {
               // Mesh reports mesh-e2ee; the SFU path reports hop-by-hop until per-frame
               // encryption is confirmed active, then sfu-e2ee. Never an aspiration.
               encryption={mesh.encryption}
+              classroom={mesh.classroom}
+              presenterName={presenterName}
             />
             <ControlBar
               muted={muted}
@@ -487,6 +520,10 @@ export default function App() {
             onMakeHost={mesh.makeHost}
             handQueue={handQueue}
             onLowerHand={mesh.lowerHand}
+            classroom={mesh.classroom}
+            onSetClassroom={mesh.setClassroom}
+            spotlightId={mesh.spotlightId}
+            onSpotlight={mesh.setSpotlight}
           />
         )}
 
