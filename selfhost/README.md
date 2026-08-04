@@ -43,6 +43,28 @@ Flags: `-addr` (listen address), `-stun` (comma-separated STUN/TURN urls).
 The test client is deliberately bare (plain `getUserMedia` + the signalling below); it
 exists to exercise the server, not to be the product.
 
+## Verify it with the real app (`PionTransport`)
+
+The browser `PionTransport` (`web/src/core/transport/PionTransport.ts`) routes the app's
+media through this SFU while presence/lobby/host still ride the signalling Worker. Testing it
+needs **three** processes:
+
+```sh
+# 1. the signalling Worker (Durable Object) — presence, lobby, host
+cd worker && bun run dev          # :8787
+
+# 2. this SFU — media fan-out
+cd selfhost && go run .           # :8088
+
+# 3. the app (Vite proxies /ws→:8787 and /sfu→:8088)
+cd web && bun run dev             # :5173
+```
+
+Open the app with **`?sfu=1`** (e.g. `http://localhost:5173/?sfu=1#<room>`) in two tabs and
+join the same room. You get the full app UI — roster, lobby, names — with media through the
+SFU. The encryption badge honestly reads **“Transport encrypted only”**: this path is *not*
+E2EE yet (see below). Without `?sfu=1` the app uses the P2P mesh (E2EE) as normal.
+
 ## Signalling
 
 One websocket per client at `/sfu?room=<id>`. JSON envelopes:
@@ -58,8 +80,12 @@ there is never glare. Clients only ever answer and trickle ICE.
 
 - ✅ Core forwarding: publish, subscribe, per-room fan-out, keyframe (PLI) requests,
   clean teardown. Compiles and `go vet`s clean.
-- ⏳ Not yet wired to the Samvad app: the browser-side `PionTransport` (implementing the
-  client `Transport` interface and reusing the app's lobby/presence signalling) is the next
-  step. Right now it stands alone behind the bare test client above.
-- ⏳ One audio + one video per participant (camera + mic). Screen-share as a second video
-  track, simulcast layer selection, and bandwidth estimation are follow-ups.
+- ✅ Wired to the Samvad app: the browser `PionTransport` implements the client `Transport`
+  interface and reuses the app's lobby/presence signalling. Opt in with `?sfu=1` (above).
+- ⏳ **Not E2EE yet.** The SFU forwards plain SRTP it *can* read, so `PionTransport` honestly
+  reports **hop-by-hop**. The next step wires the already-built `FrameCryptor` + `E2eeSession`
+  (Insertable Streams / MLS) onto this path, at which point the SFU forwards ciphertext it
+  cannot read — E2EE over a real relay, self-hosted, no Cloudflare involved.
+- ⏳ Data plugins (chat/reactions) have no SFU path yet (the SFU forwards no data channels);
+  one audio + one video per participant. Screen-share as a second video track, simulcast
+  layer selection, and bandwidth estimation are follow-ups.

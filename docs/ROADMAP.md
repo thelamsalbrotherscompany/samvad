@@ -198,9 +198,19 @@ logs demonstrably cannot reconstruct a frame.
   - ✅ **SFU server built** (`selfhost/`, Go + Pion): per-room track fan-out (publish once,
     forward to all), server-sole-offer signalling (no glare), keyframe requests, clean
     teardown. Compiles, `go vet`s, boots and serves; a bare test client (`web/index.html`)
-    verifies it in two browser tabs. Forwards RTP only — never transcodes, and blind to
-    E2EE media. ⏳ Still to do: the browser `PionTransport` (client `Transport` impl reusing
-    the app's lobby/presence signalling), screen-share as a 2nd track, and simulcast
+    verifies it in two browser tabs. Forwards RTP only — never transcodes
+  - ✅ **Browser `PionTransport` built** (`web/src/core/transport/PionTransport.ts`): the client
+    `Transport` impl, opted into with **`?sfu=1`**. Media flows through the SFU (one connection,
+    publish-once-fan-out) while presence/lobby/host **reuse the same Durable Object** as the
+    mesh — so the whole roster/knock/host system carries over unchanged (the abstraction
+    proving itself). Correlates a peer's SFU media to their roster entry with **no protocol
+    change**: it rewrites its published msid to its DO id in the answer SDP, so every subscriber
+    sees `stream.id === <publisher's id>`. Selection lives in `useMesh`; the UI is untouched.
+    Vite proxies `/sfu` → `:8088` in dev. ⚠️ **Not E2EE yet** — the SFU forwards plain SRTP it
+    can read, so the indicator honestly drops to **hop-by-hop**. ⏳ Next: wire the built
+    `FrameCryptor`/`E2eeSession` (Insertable Streams) onto this path to make it E2EE (finally
+    landing Phase 4 over a real relay, self-hosted — no Cloudflare needed), then **data plugins**
+    (chat/reactions have no SFU path yet), **screen-share** as a 2nd track, and **simulcast**
 - Published threat model, reviewed by someone who wasn't you
 - Reproducible builds; signed release binaries
 - `docs/SELF-HOSTING.md` — the one-binary path, and a TLS/reverse-proxy path

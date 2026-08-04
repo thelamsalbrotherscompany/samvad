@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MeshTransport } from './MeshTransport'
+import { PionTransport } from './PionTransport'
 import type { ActivityEvent, Phase, RemotePeer, Transport } from './Transport'
 import type { PeerInfo } from './protocol'
 
 /** A handler for messages arriving on a plugin data topic. */
 export type DataHandler = (payload: unknown, from: string) => void
 
+/** Which media transport backs the call. UI never branches on this — only useMesh does. */
+export type TransportKind = 'mesh' | 'sfu'
+
 type Options = {
   /** Connect when true (i.e. the user has joined the call). */
   enabled: boolean
+  /** Media path: P2P mesh (default) or the self-hosted Pion SFU. Presence is identical. */
+  transport: TransportKind
   roomName: string
   /** True only for "New meeting" — permits creating this room if it doesn't exist. */
   create: boolean
@@ -65,31 +71,35 @@ export function useMesh(opts: Options): Mesh {
   useEffect(() => {
     if (!opts.enabled) return
 
-    const transport = new MeshTransport(
-      opts.roomName,
-      {
-        id: '',
-        name: opts.name,
-        muted: opts.muted,
-        cameraOff: opts.cameraOff,
-        handRaised: opts.handRaised,
-        sharing: opts.screenStream != null,
+    const identity: PeerInfo = {
+      id: '',
+      name: opts.name,
+      muted: opts.muted,
+      cameraOff: opts.cameraOff,
+      handRaised: opts.handRaised,
+      sharing: opts.screenStream != null,
+    }
+    const handlers = {
+      onPeers: setPeers,
+      onConnected: setConnected,
+      onPhase: setPhase,
+      onHost: setIsHost,
+      onKnocks: setKnocks,
+      onLobbyOpen: setLobbyOpenState,
+      onData: (topic: string, from: string, payload: unknown) => {
+        subscribersRef.current.get(topic)?.forEach((h) => h(payload, from))
       },
+      onActivity: (e: ActivityEvent) => setActivity((prev) => [...prev, e]),
+    }
+    // Same constructor shape, so selection is the only line that knows the difference.
+    const Ctor = opts.transport === 'sfu' ? PionTransport : MeshTransport
+    const transport: Transport = new Ctor(
+      opts.roomName,
+      identity,
       opts.localStream,
       opts.create,
       opts.session,
-      {
-        onPeers: setPeers,
-        onConnected: setConnected,
-        onPhase: setPhase,
-        onHost: setIsHost,
-        onKnocks: setKnocks,
-        onLobbyOpen: setLobbyOpenState,
-        onData: (topic, from, payload) => {
-          subscribersRef.current.get(topic)?.forEach((h) => h(payload, from))
-        },
-        onActivity: (e) => setActivity((prev) => [...prev, e]),
-      },
+      handlers,
     )
     transport.connect()
     ref.current = transport
@@ -108,7 +118,7 @@ export function useMesh(opts: Options): Mesh {
     // Identity/stream are pushed via their own effects — not deps here, so muting
     // doesn't tear down the call.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [opts.enabled, opts.roomName])
+  }, [opts.enabled, opts.roomName, opts.transport])
 
   useEffect(() => {
     ref.current?.setLocalStream(opts.localStream)

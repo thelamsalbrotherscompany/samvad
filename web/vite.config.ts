@@ -18,6 +18,9 @@ export default defineConfig({
       '/ws': { target: 'ws://localhost:8787', ws: true },
       // ICE server list (STUN, plus TURN when the worker has credentials).
       '/ice': { target: 'http://localhost:8787' },
+      // Self-hosted Pion SFU media socket, reached with `?sfu=1`. Run it with
+      // `cd selfhost && go run .` (listens on :8088). Only used by PionTransport.
+      '/sfu': { target: 'ws://localhost:8088', ws: true },
     },
   },
 })

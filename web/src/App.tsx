@@ -53,6 +53,10 @@ export default function App() {
   const create = inRoom && roomId === createRoomId
   // Stable per-tab id used to reclaim our spot — and host role — after a drop/refresh.
   const [session] = useState(getSessionId)
+  // Opt into the self-hosted Pion SFU with `?sfu=1` (needs the Go SFU running — see
+  // selfhost/README). Media then flows through the SFU instead of the P2P mesh; presence is
+  // identical. It is NOT E2EE yet, so the indicator drops to hop-by-hop (Claude.md §6).
+  const [useSfu] = useState(() => new URLSearchParams(location.search).get('sfu') === '1')
 
   // Stop presenting and release the capture (also clears the browser's sharing banner).
   const stopScreenCapture = () => {
@@ -146,6 +150,7 @@ export default function App() {
   // Live mesh: connects on join, publishes your camera/mic, returns the remote roster.
   const mesh = useMesh({
     enabled: joined,
+    transport: useSfu ? 'sfu' : 'mesh',
     roomName: roomId,
     create,
     session,
@@ -354,11 +359,11 @@ export default function App() {
               visible={chromeVisible}
               onShare={() => setShareOpen(true)}
               raisedHands={raisedHands}
-              // Mesh is the only transport today, so every call is genuinely E2EE (P2P
-              // DTLS-SRTP — no middlebox in the media path). Do NOT report 'sfu-e2ee'
-              // until an SFU *and* Insertable-Streams/MLS frame encryption actually exist
-              // — the indicator states the real mode, never an aspiration (Claude.md §6).
-              encryption="mesh-e2ee"
+              // The indicator states the REAL mode, never an aspiration (Claude.md §6). Mesh
+              // is genuinely E2EE (P2P DTLS-SRTP, no middlebox). The Pion SFU path is not E2EE
+              // yet — the SFU forwards plain SRTP it can read — so it honestly reports
+              // hop-by-hop until Insertable-Streams/MLS frame encryption is wired onto it.
+              encryption={useSfu ? 'hop-by-hop' : 'mesh-e2ee'}
             />
             <ControlBar
               muted={muted}
