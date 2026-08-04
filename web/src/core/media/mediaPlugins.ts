@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
 import type { Capability, PluginContext, SamvadPlugin, TrackTransform } from '@/core/plugins/types'
 import { useSettingsRegistry } from '@/core/plugins/settingsRegistry'
@@ -120,40 +120,69 @@ function denySlot(slot: string, plugin: SamvadPlugin): never {
 }
 
 /**
- * Applies the currently-registered video transform to the raw camera stream, returning the
- * stream to publish and self-view. No transform / camera off / no video track → the raw
- * stream, untouched (and no canvas work). When a transform is registered, its processed
- * track replaces the raw video; audio always passes through unchanged.
+ * Applies the currently-registered video and audio transforms to the raw media, returning
+ * the stream to publish and self-view. Nothing registered → the raw stream, untouched
+ * (same identity, no processing). A registered transform's processed track replaces the raw
+ * one; the two are managed independently so, e.g., toggling the camera never restarts audio.
  *
- * The transform returns its output track synchronously (showing raw passthrough until any
- * model finishes loading), so the swap is a single track replacement, never a black frame.
+ * Video is gated by `cameraOn`; audio runs whenever a mic track is present. Each transform
+ * returns its output track synchronously (video shows raw passthrough until any model
+ * loads), so a swap is a single `replaceTrack`, never a black frame or an audio gap.
  */
 export function useProcessedStream(raw: MediaStream | null, cameraOn: boolean): MediaStream | null {
   const videoTransform = useMediaRegistry((s) => s.video)
-  const [output, setOutput] = useState<MediaStream | null>(raw)
+  const audioTransform = useMediaRegistry((s) => s.audio)
+  // null on either means "publish the raw track for this kind".
+  const [videoTrack, setVideoTrack] = useState<MediaStreamTrack | null>(null)
+  const [audioTrack, setAudioTrack] = useState<MediaStreamTrack | null>(null)
 
   useEffect(() => {
-    const videoTrack = raw?.getVideoTracks()[0] ?? null
-    if (!raw || !cameraOn || !videoTransform || !videoTrack) {
-      setOutput(raw)
+    const src = raw?.getVideoTracks()[0] ?? null
+    if (!raw || !cameraOn || !videoTransform || !src) {
+      setVideoTrack(null)
       return
     }
-
     let cancelled = false
-    setOutput(raw) // raw until the processed track exists (normally the same tick)
-    Promise.resolve(videoTransform.start(videoTrack))
-      .then((processed) => {
-        if (!cancelled) setOutput(new MediaStream([processed, ...raw.getAudioTracks()]))
+    setVideoTrack(null) // raw until the processed track exists (normally the same tick)
+    Promise.resolve(videoTransform.start(src))
+      .then((t) => {
+        if (!cancelled) setVideoTrack(t)
       })
       .catch(() => {
-        if (!cancelled) setOutput(raw) // effect failed to start — untouched camera
+        if (!cancelled) setVideoTrack(null) // failed to start — untouched camera
       })
-
     return () => {
       cancelled = true
       videoTransform.stop()
     }
   }, [raw, cameraOn, videoTransform])
 
-  return output
+  useEffect(() => {
+    const src = raw?.getAudioTracks()[0] ?? null
+    if (!raw || !audioTransform || !src) {
+      setAudioTrack(null)
+      return
+    }
+    let cancelled = false
+    setAudioTrack(null)
+    Promise.resolve(audioTransform.start(src))
+      .then((t) => {
+        if (!cancelled) setAudioTrack(t)
+      })
+      .catch(() => {
+        if (!cancelled) setAudioTrack(null) // failed to start — untouched mic
+      })
+    return () => {
+      cancelled = true
+      audioTransform.stop()
+    }
+  }, [raw, audioTransform])
+
+  return useMemo(() => {
+    if (!raw) return raw
+    if (!videoTrack && !audioTrack) return raw // nothing processed — pass raw through as-is
+    const v = videoTrack ?? raw.getVideoTracks()[0]
+    const a = audioTrack ?? raw.getAudioTracks()[0]
+    return new MediaStream([v, a].filter(Boolean) as MediaStreamTrack[])
+  }, [raw, videoTrack, audioTrack])
 }

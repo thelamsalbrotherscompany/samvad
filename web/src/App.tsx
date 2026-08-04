@@ -26,6 +26,7 @@ import { PluginHost, PluginStageOverlay } from '@/core/plugins/PluginHost'
 import reactionsPlugin from '@/plugins/reactions'
 import chatPlugin from '@/plugins/chat'
 import backgroundPlugin from '@/plugins/background'
+import noisePlugin from '@/plugins/noise'
 import { useCallShortcuts } from '@/lib/useCallShortcuts'
 import { useFullscreen } from '@/lib/useFullscreen'
 import { useIdle } from '@/lib/useIdle'
@@ -40,7 +41,7 @@ const PLUGINS = [reactionsPlugin, chatPlugin]
 // Media-transform plugins (video/audio + the settings slot). They run at the app root, from
 // pre-join onward, because local camera/mic exist before you're in the room — see the
 // media-plugin host in core/media/mediaPlugins.ts.
-const MEDIA_PLUGINS = [backgroundPlugin]
+const MEDIA_PLUGINS = [backgroundPlugin, noisePlugin]
 
 export default function App() {
   const { roomId, enterRoom, leaveRoom } = useRoom()

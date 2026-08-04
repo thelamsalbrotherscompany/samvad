@@ -309,8 +309,10 @@ All three are small, complete, and use nothing but the public API:
   button, unread badge, and panel entirely within the `toolbar` slot — proof you don't need
   a dedicated panel slot to build a rich panel.
 - **`web/src/plugins/background/`** — a `video-transform` + `settings` slot. Shows a media
-  plugin that owns its segmentation/compositing pipeline and registers a `TrackTransform`
-  only while an effect is on.
+  plugin that owns its segmentation/compositing pipeline (and a Web Worker) and registers a
+  `TrackTransform` only while an effect is on.
+- **`web/src/plugins/noise/`** — an `audio-transform` + `settings` slot. A noise gate from
+  standard Web Audio nodes; the same register-while-enabled shape as background.
 
 ---
 

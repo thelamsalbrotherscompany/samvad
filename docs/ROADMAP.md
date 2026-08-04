@@ -97,8 +97,12 @@ useful on its own terms, even with everything below unbuilt.
     uploaded, never persisted), and composited back into the published stream — so **peers see
     it too**, not just the local view. The plugin owns its own settings picker (the `settings`
     slot) and registers its transform only while an effect is on. Graceful fallback to the raw
-    camera when unsupported. Bundling stock backgrounds and pipeline-based noise suppression are
-    what's left of the effects set
+    camera when unsupported. Bundling stock backgrounds is what's left of the effects set
+  - ✅ **Noise gate** (`web/src/plugins/noise/`): a first-party **`audio-transform`** plugin —
+    the dogfood proof that audio transforms work. High-pass (85 Hz, strips rumble) → an
+    analyser-driven gain that attenuates the mic on silence with fast-attack / gentle-release
+    hysteresis, from standard Web Audio nodes (no AudioWorklet). Opt-in (off by default), a
+    complement to the browser's built-in suppression, not a replacement
 - ✅ UI slots and data-channel topics (part of the plugin host above)
 - ✅ **Reactions and chat rebuilt as first-party plugins** (`web/src/plugins/reactions/`,
   `web/src/plugins/chat/`) — the dogfood test of the API (docs/PLUGINS.md §8). Each imports
