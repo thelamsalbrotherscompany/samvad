@@ -68,28 +68,37 @@ useful on its own terms, even with everything below unbuilt.
 - ✅ **Plugin host** (`web/src/core/plugins/`): the public contract from docs/PLUGINS.md §1
   (`SamvadPlugin`, capability manifest, `PluginContext`), a **capability-gated context**
   (a method/slot a plugin didn't declare isn't attached, or throws), **UI slots**
-  (toolbar, tile-overlay, stage-overlay), and **E2EE data topics** (namespaced per plugin,
-  over the same P2P channel as media). ⚠️ First-party, **in-process** for now — the Worker
-  sandbox that strips `fetch`/etc. from untrusted plugins, manifest integrity hashes, and
-  `video-transform`/`audio-transform`/`network`/`storage` capabilities are declared in the
-  types but not yet enforced
-- Media pipeline: `MediaStreamTrackProcessor` chain in a worker, shared WebGL2 context
-- Frame-budget enforcement and auto-disable on repeated overrun
+  (toolbar, tile-overlay, stage-overlay, **settings**), **E2EE data topics** (namespaced per
+  plugin, over the same P2P channel as media), and **`video-transform` / `audio-transform`**
+  via a **media-plugin host** (`web/src/core/media/mediaPlugins.ts`) that runs from pre-join.
+  ⚠️ First-party, **in-process** for now — the Worker sandbox that strips `fetch`/etc. from
+  untrusted plugins, manifest integrity hashes, and `network`/`storage` enforcement are
+  declared in the types but not yet enforced (Phase 6 / see below)
+- ✅ **Media pipeline**: a generic video-transform pipeline in core applies whatever
+  `TrackTransform` a plugin registers (raw track when none), and MediaPipe **segmentation runs
+  in a Web Worker** (`plugins/background/segmenter.worker.ts`) — inference and the O(pixels)
+  mask loop leave the main thread; the worker posts back an alpha-mask bitmap and the main
+  thread composites. Output stays a plain `canvas.captureStream()` (no
+  `MediaStreamTrackGenerator`), so it's cross-browser and never emits a black frame; it falls
+  back to main-thread segmentation if the worker can't run. ⏳ *Still open:* a **shared WebGL2
+  compositor** (compositing is Canvas2D today) — a real optimisation that wants on-device
+  profiling to tune
+- ⏳ **Frame budget**: the segmentation worker self-throttles (one frame in flight), so the
+  effect *adapts* under load rather than stalling. A host-level **auto-disable on repeated
+  overrun** is deliberately scoped to the **untrusted-plugin sandbox** (Phase 6): auto-off is
+  wrong for a *privacy* effect — disabling blur would expose the user's real background — so a
+  first-party effect must degrade, never disable
 - Reference plugins: **background blur**, **background replace**, noise suppression
-  - ✅ **Background blur** shipped as a real effect (`web/src/core/effects/`): MediaPipe
-    Selfie Segmenter (WASM + model **vendored in `public/mediapipe/`, no CDN**, lazy-loaded
-    only when enabled) segments the person; the background is blurred and composited on a
-    canvas, captured back into the published stream — so **peers see the blur too**, not
-    just the local view. Graceful fallback to the raw camera when unsupported. ⚠️ Built in
-    `core/` for now to prove the pipeline; per non-negotiable #7 it must be **re-expressed
-    through the public plugin API** once the plugin host lands. Compositing runs on the main
-    thread — the worker + shared-WebGL2 move is still pending
-  - ✅ **Background replace** (virtual background): the same pipeline, generalised
-    (`BackgroundEffect`) to composite the person over a **user-picked image** instead of a
-    blurred frame. The image is read to a data URL and kept **in memory on-device only** —
-    never uploaded, never persisted; falls back to blur while it loads. `Settings →
-    Background → Image` opens a local file picker. Bundling stock backgrounds and
-    pipeline-based noise suppression are what's left of the effects set
+  - ✅ **Background blur / replace** shipped as a **first-party plugin**
+    (`web/src/plugins/background/`), built on the public API only (non-negotiable #7): MediaPipe
+    Selfie Segmenter (WASM + model **vendored in `public/mediapipe/`, no CDN**, lazy-loaded only
+    when enabled) segments the person; the background is blurred, or replaced with a
+    **user-picked image** (read to a data URL, kept **in memory on-device only** — never
+    uploaded, never persisted), and composited back into the published stream — so **peers see
+    it too**, not just the local view. The plugin owns its own settings picker (the `settings`
+    slot) and registers its transform only while an effect is on. Graceful fallback to the raw
+    camera when unsupported. Bundling stock backgrounds and pipeline-based noise suppression are
+    what's left of the effects set
 - ✅ UI slots and data-channel topics (part of the plugin host above)
 - ✅ **Reactions and chat rebuilt as first-party plugins** (`web/src/plugins/reactions/`,
   `web/src/plugins/chat/`) — the dogfood test of the API (docs/PLUGINS.md §8). Each imports
