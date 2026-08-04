@@ -106,6 +106,27 @@ test('key rotation: the receiver keeps the previous epoch key for in-flight fram
   expect(Array.from(new Uint8Array(dec!.data).subarray(10))).toEqual([9, 8, 7])
 })
 
+test('seal/open round-trips a message under the group key (plugin data over the SFU)', async () => {
+  const sender = new FrameCryptor()
+  const receiver = new FrameCryptor()
+  const wrong = new FrameCryptor()
+  await sender.setEpochSecret(1, SECRET_A)
+  await receiver.setEpochSecret(1, SECRET_A)
+  await wrong.setEpochSecret(1, SECRET_B)
+
+  const msg = new TextEncoder().encode(JSON.stringify({ text: 'hello over the SFU' }))
+  const sealed = await sender.seal(msg)
+  expect(sealed).not.toBeNull()
+
+  const opened = await receiver.open(sealed!)
+  expect(opened).not.toBeNull()
+  expect(new TextDecoder().decode(opened!)).toBe('{"text":"hello over the SFU"}')
+
+  // A different key can't open it, and an unkeyed cryptor can't seal.
+  expect(await wrong.open(sealed!)).toBeNull()
+  expect(await new FrameCryptor().seal(msg)).toBeNull()
+})
+
 test('before any key, frames pass through in the clear (ramp-up never blacks out media)', async () => {
   const cryptor = new FrameCryptor()
   expect(cryptor.ready).toBe(false)

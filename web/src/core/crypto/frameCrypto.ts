@@ -99,6 +99,40 @@ export class FrameCryptor {
     })
   }
 
+  /**
+   * Seal an arbitrary message under the current epoch key (for plugin data — chat, reactions —
+   * over the SFU's data relay, so the relay forwards ciphertext it can't read). Returns a plain
+   * `number[]` (JSON-transportable): `[ epoch(1) ][ iv(12) ][ AES-GCM ciphertext+tag ]`. Null if
+   * we're not keyed yet.
+   */
+  async seal(plain: Uint8Array): Promise<number[] | null> {
+    const key = this.keys.get(this.epoch)
+    if (!key) return null
+    const buf = new Uint8Array(plain.length)
+    buf.set(plain)
+    const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES))
+    const cipher = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, buf))
+    const out = new Uint8Array(1 + IV_BYTES + cipher.length)
+    out[0] = this.epoch
+    out.set(iv, 1)
+    out.set(cipher, 1 + IV_BYTES)
+    return Array.from(out)
+  }
+
+  /** Open a message sealed by {@link seal}. Null if we lack the key or authentication fails. */
+  async open(data: readonly number[]): Promise<Uint8Array | null> {
+    const bytes = Uint8Array.from(data)
+    if (bytes.length < 1 + IV_BYTES) return null
+    const key = this.keys.get(bytes[0])
+    if (!key) return null
+    const iv = bytes.subarray(1, 1 + IV_BYTES)
+    try {
+      return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, bytes.subarray(1 + IV_BYTES)))
+    } catch {
+      return null
+    }
+  }
+
   /** A TransformStream that decrypts incoming encoded frames. */
   decryptStream(): TransformStream<EncodedFrame, EncodedFrame> {
     return new TransformStream({

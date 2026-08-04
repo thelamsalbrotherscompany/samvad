@@ -181,8 +181,11 @@ Phase 1 — that unchanged UI is the proof the abstraction was correct.
   aspiration (non-negotiable #6)
 - ✅ **Fallback for browsers lacking Insertable Streams**: `pipeThrough` returns false, no
   transform attaches, and the indicator honestly stays `hop-by-hop` — the call still works
-- ⏳ E2EE plugin data (chat/reactions) over the SFU — the same MLS key can seal payloads on the
-  DO relay; not wired yet
+- ✅ **E2EE plugin data over the SFU** — chat/reactions ride the DO relay too, but each payload
+  is **sealed under the MLS group key** first (`FrameCryptor.seal/open`), so the relay forwards
+  ciphertext it can't read. Verified end-to-end: a chat message sent between two `?sfu=1` clients
+  arrives decrypted (`web/e2e/sfu-integration.mjs` covers the call lifecycle; a seal/open unit
+  test covers the cipher)
 
 **Done when:** packet capture at the SFU yields no intelligible media, and the SFU's own
 logs demonstrably cannot reconstruct a frame. *(Needs the 3-process local run in Chromium to
@@ -221,8 +224,9 @@ confirm end-to-end — see `selfhost/README`.)*
     Vite proxies `/sfu` → `:8088` in dev. ✅ **E2EE wired** — the built `FrameCryptor` +
     `E2eeSession` (Insertable Streams / MLS) attach to the SFU connection over a new DO data
     relay, so the SFU forwards ciphertext it can't read; the indicator shows `sfu-e2ee` once
-    keyed (else honest `hop-by-hop`). See Phase 4. ⏳ Remaining: **data plugins** (chat/reactions
-    over the SFU), **screen-share** as a 2nd track, and **simulcast**
+    keyed (else honest `hop-by-hop`). Plugin data (chat/reactions) rides the relay **sealed under
+    the group key**, so it's E2EE too. See Phase 4. ⏳ Remaining: **screen-share** as a 2nd track,
+    and **simulcast**
 - Published threat model, reviewed by someone who wasn't you
 - Reproducible builds; signed release binaries
 - `docs/SELF-HOSTING.md` — the one-binary path, and a TLS/reverse-proxy path

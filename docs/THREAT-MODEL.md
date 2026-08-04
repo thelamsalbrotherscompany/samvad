@@ -140,9 +140,9 @@ where scrutiny belongs, and where an external review is worth paying for before 
   where it's needed (the self-hosted SFU path has it today; the Cloudflare one reuses the same
   crypto once deployed). The encryption indicator states which mode is actually active
   (`mesh-e2ee` / `sfu-e2ee` / `hop-by-hop`)
-- **Plugin data over the SFU isn't E2EE yet.** Chat/reactions ride the P2P channel on mesh
-  (E2EE); on the SFU path they have no encrypted route yet, so they're currently disabled
-  there rather than sent in the clear
+- **Plugin data is E2EE on both paths.** Chat/reactions ride the P2P channel on mesh (E2EE by
+  construction); on the SFU path they ride the Durable-Object relay **sealed under the MLS group
+  key**, so the relay forwards ciphertext it can't read — same guarantee as the media
 - **Passphrase strength is the user's problem.** A weak passphrase is a weak room. The UI
   generates a strong one by default and resists users weakening it
 - **Removal is imperfect.** Rotating the key on leave stops future access, but a departed

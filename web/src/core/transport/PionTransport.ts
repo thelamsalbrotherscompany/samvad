@@ -21,11 +21,11 @@ import { pipeThrough } from '@/core/crypto/frameCrypto'
  * that msid to our **DO id** in the answer SDP; every subscriber then sees
  * `stream.id === <publisher's DO id>` and maps the media straight onto the roster.
  *
- * ⚠️ **Not end-to-end encrypted yet.** The SFU forwards plain SRTP it *can* read — the honest
- * indicator is `hop-by-hop`, not E2EE. Insertable-Streams frame encryption (the built
- * `FrameCryptor` + `E2eeSession`) is the next step that makes this path E2EE. Data plugins
- * (chat, reactions) and screen-share are follow-ups too: the SFU forwards no data channels and
- * one video track per peer today.
+ * **End-to-end encrypted.** Insertable-Streams frame encryption (`FrameCryptor`) keyed by an
+ * `E2eeSession` (MLS over the DO data relay) makes the SFU forward ciphertext it can't read —
+ * the indicator reads `sfu-e2ee` once the group keys, else honest `hop-by-hop`. **Plugin data**
+ * (chat, reactions) rides the same relay, sealed under the group key, so it's E2EE too. Still a
+ * follow-up: **screen-share** (the SFU carries one video track per peer today) and simulcast.
  */
 
 const STUN_FALLBACK: RTCIceServer[] = [{ urls: 'stun:stun.cloudflare.com:3478' }]
@@ -232,9 +232,14 @@ export class PionTransport implements Transport {
         this.mergePeer(msg.peer)
         break
 
-      // The MLS handshake (delivery service for E2EE) rides this relay.
       case 'data':
-        this.dataHandlers.get(msg.topic)?.(msg.payload, msg.from)
+        if (this.dataHandlers.has(msg.topic)) {
+          // Internal traffic (the MLS handshake) — its delivery service is this relay.
+          this.dataHandlers.get(msg.topic)?.(msg.payload, msg.from)
+        } else {
+          // Plugin data (chat, reactions) — sealed under the group key; decrypt then dispatch.
+          void this.openPluginData(msg.topic, msg.from, msg.payload)
+        }
         break
 
       // Media is the SFU's job here — the DO's peer-to-peer relay is mesh-only.
@@ -486,12 +491,31 @@ export class PionTransport implements Transport {
   }
 
   /**
-   * Plugin data (chat, reactions) has no path over the SFU yet — it forwards no data channels,
-   * and routing via the DO would make it server-visible. A no-op until the E2EE data path
-   * lands (Insertable Streams / MLS over the SFU).
+   * Plugin data (chat, reactions) over the SFU: the SFU forwards no data channels, so it rides
+   * the DO relay — but **sealed under the MLS group key** first, so the relay forwards ciphertext
+   * it can't read (same E2EE as the media). Dropped silently until the group is keyed (a rare
+   * early window); the plugin handles its own local echo, exactly as on mesh.
    */
-  sendData(_topic: string, _payload: unknown, _opts?: { to?: string }): void {
-    // Deferred — see the class note.
+  sendData(topic: string, payload: unknown, opts?: { to?: string }): void {
+    const cryptor = this.e2ee?.cryptor
+    if (!cryptor) return
+    const plain = new TextEncoder().encode(JSON.stringify(payload))
+    void cryptor.seal(plain).then((sealed) => {
+      if (sealed) this.sendToServer({ type: 'data', to: opts?.to, topic, payload: sealed })
+    })
+  }
+
+  /** Decrypt sealed plugin data from a peer and dispatch it to the plugins (via onData). */
+  private async openPluginData(topic: string, from: string, payload: unknown): Promise<void> {
+    const cryptor = this.e2ee?.cryptor
+    if (!cryptor || !Array.isArray(payload)) return
+    const plain = await cryptor.open(payload as number[])
+    if (!plain) return
+    try {
+      this.handlers.onData(topic, from, JSON.parse(new TextDecoder().decode(plain)))
+    } catch {
+      // Malformed after decrypt — ignore.
+    }
   }
 
   leave(): void {
