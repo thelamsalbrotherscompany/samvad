@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
 import type { Capability, PluginContext, SamvadPlugin, TileParticipant } from './types'
+import { useSettingsRegistry } from './settingsRegistry'
 
 /**
  * Loads plugins and exposes what they register — nothing more. Each plugin's `setup`
@@ -87,6 +88,12 @@ export function PluginHost({
           registerStageOverlay: (c) => {
             requireSlot(uiSlots, 'stage-overlay', plugin)
             reg.stage.push(c)
+          },
+          registerSettingsPanel: (c) => {
+            requireSlot(uiSlots, 'settings', plugin)
+            // Settings live in a module registry (reachable from the Settings dialog above
+            // the room), not the in-room slot context; drop it on teardown.
+            cleanups.push(useSettingsRegistry.getState().add(c))
           },
         }
       }

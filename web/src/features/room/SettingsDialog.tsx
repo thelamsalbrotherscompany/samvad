@@ -1,16 +1,13 @@
-import { useRef, type ReactNode, type ChangeEvent } from 'react'
+import { type ReactNode } from 'react'
 import { Dialog } from 'radix-ui'
 import { Button, Select, Toggle } from '@/design/primitives'
 import { CloseIcon } from '@/design/icons'
 import { initialsOf } from '@/core/participants'
 import { VideoView } from '@/core/media/VideoView'
 import type { DeviceList } from '@/core/media/useLocalMedia'
+import { useSettingsPanels } from '@/core/plugins/settingsRegistry'
 import { MicMeter } from '@/features/room/MicMeter'
-import {
-  selfVideoStyle,
-  type Background,
-  type Settings,
-} from '@/lib/settings'
+import { selfVideoStyle, type Settings } from '@/lib/settings'
 import { cn } from '@/lib/cn'
 
 type Props = {
@@ -62,12 +59,6 @@ async function playTestTone(deviceId: string | null) {
   }
 }
 
-const BACKGROUNDS: { value: Background; label: string }[] = [
-  { value: 'none', label: 'None' },
-  { value: 'blur', label: 'Blur' },
-  { value: 'strong-blur', label: 'Strong blur' },
-]
-
 const SHORTCUTS: [keys: string[], desc: string][] = [
   [['M'], 'Toggle microphone'],
   [['V'], 'Toggle camera'],
@@ -75,115 +66,6 @@ const SHORTCUTS: [keys: string[], desc: string][] = [
   [['F'], 'Full screen'],
   [['Space'], 'Push to talk (hold)'],
 ]
-
-/** Read a picked image file into a data URL, kept entirely in memory on this device. */
-function readImageFile(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader()
-    r.onload = () => resolve(r.result as string)
-    r.onerror = () => reject(r.error)
-    r.readAsDataURL(file)
-  })
-}
-
-function Chip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: ReactNode
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        'rounded-lg px-3 py-1.5 text-[13px] transition-colors',
-        active
-          ? 'bg-accent font-medium text-base'
-          : 'bg-surface-2 text-ink-muted hover:text-ink',
-      )}
-    >
-      {children}
-    </button>
-  )
-}
-
-/**
- * Blur / strong-blur / a virtual-background image. The image is a file the user picks from
- * their own device — read to a data URL and kept in memory only (never uploaded, never
- * persisted). Choosing "Image" with nothing picked yet opens the file browser.
- */
-function BackgroundPicker({
-  value,
-  image,
-  onChange,
-}: {
-  value: Background
-  image: string | null
-  onChange: (patch: Partial<Settings>) => void
-}) {
-  const fileRef = useRef<HTMLInputElement>(null)
-  const pick = () => fileRef.current?.click()
-
-  const onFile = async (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    e.target.value = '' // let the same file be re-picked later
-    if (!file) return
-    try {
-      onChange({ background: 'image', backgroundImage: await readImageFile(file) })
-    } catch {
-      // Unreadable file — leave the background as it was.
-    }
-  }
-
-  return (
-    <div className="space-y-2.5">
-      <div className="flex flex-wrap gap-1.5">
-        {BACKGROUNDS.map((b) => (
-          <Chip key={b.value} active={value === b.value} onClick={() => onChange({ background: b.value })}>
-            {b.label}
-          </Chip>
-        ))}
-        <Chip active={value === 'image'} onClick={() => (image ? onChange({ background: 'image' }) : pick())}>
-          Image
-        </Chip>
-      </div>
-
-      {(value === 'image' || image) && (
-        <div className="flex items-center gap-3">
-          {image ? (
-            <img
-              src={image}
-              alt=""
-              className="h-12 w-20 rounded-md object-cover ring-1 ring-line/60"
-            />
-          ) : (
-            <div className="grid h-12 w-20 place-items-center rounded-md bg-surface-2 text-[11px] text-ink-faint ring-1 ring-line/60">
-              No image
-            </div>
-          )}
-          <button onClick={pick} className="text-[13px] text-accent hover:underline">
-            {image ? 'Change' : 'Choose image…'}
-          </button>
-          {image && (
-            <button
-              onClick={() =>
-                onChange({ background: value === 'image' ? 'none' : value, backgroundImage: null })
-              }
-              className="text-[13px] text-ink-faint transition-colors hover:text-ink"
-            >
-              Remove
-            </button>
-          )}
-        </div>
-      )}
-
-      <input ref={fileRef} type="file" accept="image/*" onChange={onFile} className="hidden" />
-    </div>
-  )
-}
 
 export function SettingsDialog({
   open,
@@ -205,6 +87,8 @@ export function SettingsDialog({
   const initials = initialsOf(name || 'You')
   const showVideo = !cameraOff && !!stream && stream.getVideoTracks().length > 0
   const hasMic = !!stream && stream.getAudioTracks().length > 0
+  // Plugin-contributed Settings sections (e.g. the background picker) — core owns none of it.
+  const pluginPanels = useSettingsPanels()
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -266,14 +150,12 @@ export function SettingsDialog({
                   onCheckedChange={(v) => onChange({ mirrorRemote: v })}
                 />
               </Row>
-              <Row label="Background" stacked>
-                <BackgroundPicker
-                  value={settings.background}
-                  image={settings.backgroundImage}
-                  onChange={onChange}
-                />
-              </Row>
             </Section>
+
+            {/* Media plugins (e.g. background effects) contribute their own sections here. */}
+            {pluginPanels.map((Panel, i) => (
+              <Panel key={i} />
+            ))}
 
             <Section title="Devices">
               <Field label="Camera">

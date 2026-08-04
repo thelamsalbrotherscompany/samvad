@@ -16,7 +16,7 @@ import { LockIcon } from '@/design/icons'
 import { TILE_WASHES, type Participant } from '@/core/participants'
 import { useLocalMedia } from '@/core/media/useLocalMedia'
 import { useActiveSpeaker } from '@/core/media/useActiveSpeaker'
-import { useProcessedStream } from '@/core/effects/useProcessedStream'
+import { useMediaPlugins, useProcessedStream } from '@/core/media/mediaPlugins'
 import { RemoteAudio } from '@/core/media/RemoteAudio'
 import { useMesh } from '@/core/transport/useMesh'
 import { useRoom } from '@/core/room/useRoom'
@@ -25,6 +25,7 @@ import { getSessionId, getCreatedRoom, setCreatedRoom } from '@/core/room/sessio
 import { PluginHost, PluginStageOverlay } from '@/core/plugins/PluginHost'
 import reactionsPlugin from '@/plugins/reactions'
 import chatPlugin from '@/plugins/chat'
+import backgroundPlugin from '@/plugins/background'
 import { useCallShortcuts } from '@/lib/useCallShortcuts'
 import { useFullscreen } from '@/lib/useFullscreen'
 import { useIdle } from '@/lib/useIdle'
@@ -32,9 +33,14 @@ import { useIsNarrow } from '@/lib/useMediaQuery'
 import { DEFAULT_SETTINGS, type Settings } from '@/lib/settings'
 import { cn } from '@/lib/cn'
 
-// First-party plugins, loaded with every call. Each is built on the public plugin API
-// only — no privileged core access (docs/PLUGINS.md).
+// In-room plugins (data + UI slots), loaded once you're admitted. Each is built on the
+// public plugin API only — no privileged core access (docs/PLUGINS.md).
 const PLUGINS = [reactionsPlugin, chatPlugin]
+
+// Media-transform plugins (video/audio + the settings slot). They run at the app root, from
+// pre-join onward, because local camera/mic exist before you're in the room — see the
+// media-plugin host in core/media/mediaPlugins.ts.
+const MEDIA_PLUGINS = [backgroundPlugin]
 
 export default function App() {
   const { roomId, enterRoom, leaveRoom } = useRoom()
@@ -103,15 +109,13 @@ export default function App() {
   const [displayName, setDisplayName] = useState('Sangam Lamsal')
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
 
-  // Real background effect baked into the camera stream — so peers get the blurred
-  // background too, not just your local view. Off/unsupported returns the raw stream.
-  // This is what everything downstream (self-view, previews, and the mesh) publishes.
-  const localStream = useProcessedStream(
-    media.stream,
-    settings.background,
-    settings.backgroundImage,
-    media.cameraOn,
-  )
+  // Run media-transform plugins (e.g. background blur) at the app root, so an effect can
+  // apply from pre-join. Then the generic pipeline bakes whatever transform is registered
+  // into the camera stream — so peers get the effect too, not just the local view. With
+  // nothing registered it returns the raw stream. This is what everything downstream
+  // (self-view, previews, and the mesh) publishes.
+  useMediaPlugins(MEDIA_PLUGINS)
+  const localStream = useProcessedStream(media.stream, media.cameraOn)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [participantsOpen, setParticipantsOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)

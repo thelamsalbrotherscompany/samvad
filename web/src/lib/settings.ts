@@ -1,7 +1,5 @@
 import type { CSSProperties } from 'react'
 
-export type Background = 'none' | 'blur' | 'strong-blur' | 'image'
-
 export type Settings = {
   /**
    * Mirror your OWN self-view. **On by default, and it must stay that way** — a
@@ -20,21 +18,12 @@ export type Settings = {
    * only YOUR view; it changes nothing for other participants.
    */
   mirrorRemote: boolean
-  background: Background
-  /**
-   * The virtual-background image when `background === 'image'` — a data URL from a file the
-   * user picked on their own device. Stays local (never uploaded, never persisted; state
-   * dies with the session, like everything else). Null when no image is chosen.
-   */
-  backgroundImage: string | null
   noiseSuppression: boolean
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   mirror: true,
   mirrorRemote: false,
-  background: 'none',
-  backgroundImage: null,
   noiseSuppression: true,
 }
 
@@ -53,8 +42,9 @@ export function shouldMirror(
 
 /**
  * Styling for a REAL self <video> frame: just the mirror flip. Background blur is now a
- * real effect baked into the stream pixels by the effects pipeline (`core/effects`), not
- * a CSS filter — so it applies to what peers see too, and only the background is softened.
+ * real effect baked into the stream pixels by the background plugin (`plugins/background`,
+ * applied through the media-plugin pipeline), not a CSS filter — so it applies to what peers
+ * see too, and only the background is softened.
  */
 export function selfVideoStyle(s: Pick<Settings, 'mirror'>): CSSProperties {
   return {

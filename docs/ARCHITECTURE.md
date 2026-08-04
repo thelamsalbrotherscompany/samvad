@@ -219,7 +219,7 @@ samvad/
 │   │   │                      #   plugin host, crypto (MLS + frame cipher)
 │   │   ├── design/            # tokens, primitives, icons — the design system
 │   │   ├── features/          # stage, roster, controls, panels, pre-join, home
-│   │   └── plugins/           # first-party plugins (reactions, chat), via the public API
+│   │   └── plugins/           # first-party plugins (reactions, chat, background), public API only
 │   └── index.html
 ├── crypto/mls/                # Rust crate: MLS via OpenMLS → WASM (vendored into web/)
 ├── selfhost/                  # Go + Pion self-hosted SFU (the sovereignty exit)

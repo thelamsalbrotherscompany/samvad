@@ -55,63 +55,95 @@ talking to the internet.
 ## 2. Media pipeline plugins
 
 Video and audio transforms are the plugin type most contributors will write, so this is
-the path that gets the most care.
-
-Frames flow through an ordered chain, entirely on-device, **before** encryption and
-transmission:
+the path that gets the most care. A transform runs entirely on-device, **before**
+encryption and transmission; its output track is what peers receive:
 
 ```
-camera ─► [ transform₁ ] ─► [ transform₂ ] ─► ... ─► E2EE encrypt ─► SFU
-             blur           color-correct
+camera track ─► [ video-transform ] ─► published track ─► E2EE ─► peers / SFU
+                    (e.g. blur)
 ```
+
+### The contract (as built)
+
+A media plugin declares a `video-transform` and/or `audio-transform` capability and, in
+`setup`, registers a `TrackTransform` through `ctx.media`:
 
 ```ts
-export interface VideoTransform {
-  init(ctx: {
-    width: number
-    height: number
-    gl: WebGL2RenderingContext     // shared context, already bound
-    signal: AbortSignal
-  }): Promise<void>
-
-  /** Return the transformed frame, or `null` to drop it. MUST close the input frame. */
-  transform(frame: VideoFrame): Promise<VideoFrame | null>
-
-  dispose(): void
+export interface TrackTransform {
+  /** Begin processing the raw track; return the track to publish. Return synchronously so
+   *  there's no gap — show raw passthrough on the returned track until any model loads.
+   *  The plugin may run a Web Worker internally. */
+  start(input: MediaStreamTrack): MediaStreamTrack | Promise<MediaStreamTrack>
+  /** Stop and release everything. The host reverts to the raw track. */
+  stop(): void
 }
 ```
 
-### Non-negotiable rules
+The plugin owns the whole pipeline — segmentation, compositing, any worker — and hands the
+host a finished track. The host stays transform-agnostic: it publishes whatever track is
+registered, or the raw one when nothing is.
 
-1. **Runs in a Web Worker.** Uses `MediaStreamTrackProcessor` / `MediaStreamTrackGenerator`.
-   The main thread never blocks, so the UI stays at 60fps even when a transform stalls
-2. **Frame budget: 16ms at 30fps.** The host measures every transform. Blow the budget
-   three times in a row and the host disables the plugin and surfaces *which* one and
-   *why* — a slow plugin degrades itself, never the call
-3. **Close your frames.** `VideoFrame` holds GPU memory that GC will not reclaim.
-   A leak here kills the tab in under a minute. The host asserts this in dev builds
-4. **Shared WebGL context.** Ten plugins must not mean ten GL contexts
+### The media-plugin host runs from pre-join
 
-### Reference plugin: background blur
+Local camera and mic exist *before* you're admitted, so media plugins load at the app root
+and are live in the pre-join preview — separately from the in-room host that carries chat
+and reactions (those need the room). A media plugin may use only the `settings` UI slot
+(§3); toolbar/tile/stage belong to in-room plugins.
+
+### Register only while wanted
+
+`registerVideoTransform` / `registerAudioTransform` return an **unregister** function.
+Register when the effect turns on and unregister when off — with nothing registered the
+host publishes the raw track, so an idle effect costs zero frames.
+
+### Rules
+
+1. **Never block the main thread.** A transform doing heavy work (segmentation, shaders)
+   should run it in a **Web Worker** with a **WebGL2 / `OffscreenCanvas`** compositor,
+   falling back to a main-thread path only where those APIs are unavailable.
+2. **The host guards the budget.** It watches the published track; if a transform's output
+   cadence collapses it reverts to the raw camera rather than let one plugin drag the call
+   down — a slow effect degrades itself, never the meeting.
+3. **Models ship with the plugin.** Segmentation runs as a **bundled WASM model** — executed
+   locally, never fetched at runtime. This is why blur needs no `network`, and it's what
+   makes the permission model meaningful rather than decorative. Users can swap the model;
+   that's the point of a plugin system.
+
+### Reference plugin: background effects
 
 ```ts
 export default {
-  id: 'org.samvad.blur',
-  name: 'Background Blur',
+  id: 'org.samvad.background',
+  name: 'Background effects',
   version: '1.0.0',
   capabilities: [{ type: 'video-transform' }, { type: 'ui', slot: 'settings' }],
 
   setup(ctx) {
-    ctx.registerVideoTransform(new BlurTransform(), { order: 100 })
-    ctx.registerSettings(BlurSettingsPanel)
+    ctx.ui?.registerSettingsPanel(BackgroundSettings)
+    let off: (() => void) | null = null
+    // Register the transform only while an effect is chosen; drop it when off.
+    const sync = () => {
+      const wants = wantsEffect(store.getState())
+      if (wants && !off) off = ctx.media?.registerVideoTransform(new BackgroundTransform()) ?? null
+      else if (!wants && off) { off(); off = null }
+    }
+    sync()
+    store.subscribe(sync)
   },
 } satisfies SamvadPlugin
 ```
 
-Segmentation runs as a **bundled WASM model** — shipped with the plugin, executed
-locally, never fetched at runtime. This is why blur doesn't need `network`, and it's
-exactly the property that makes the permission model meaningful rather than decorative.
-Users can swap the model; that's the point of a plugin system.
+`web/src/plugins/background/` is exactly this — blur, strong-blur, and virtual-background
+image, built on the public API only. It's the dogfood proof that `video-transform` is real.
+
+### Where this is headed
+
+For **untrusted** third-party plugins the target is a stricter, host-owned frame pipeline:
+one shared Web Worker with a single WebGL2 context and a per-frame
+`transform(frame: VideoFrame): VideoFrame | null` contract under a hard 16 ms budget — so a
+plugin can neither hold a raw camera track nor leak `VideoFrame`s. First-party, in-process
+plugins use the track-level contract above today; the frame-level model lands with the
+Worker sandbox (§7, Phase 6).
 
 ---
 

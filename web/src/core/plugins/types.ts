@@ -5,11 +5,12 @@ import type { ComponentType } from 'react'
  * exactly this surface — no privileged imports from core — so the API stays honest: if a
  * real feature can't be written through it, the API is wrong and the fix is the API.
  *
- * This is a faithful *subset* of the documented contract: the `data`, `ui`, and
- * `lifecycle` capabilities are wired now. `video-transform` / `audio-transform`,
- * `storage`, and `network` are part of the type (so manifests are forward-compatible) but
- * not yet enforced by a host runtime — and untrusted plugins do not yet run in a Worker
- * sandbox. First-party, in-process plugins that use only this API are the current target.
+ * Most of the documented contract is wired: `data`, `ui` (toolbar / tile-overlay /
+ * stage-overlay / settings), and `video-transform` / `audio-transform` (via a media-plugin
+ * host that runs from pre-join, since local media exists before you're admitted). `storage`
+ * and `network` are part of the type (so manifests are forward-compatible) but not yet
+ * enforced, `lifecycle` is not yet delivered, and untrusted plugins do not yet run in a
+ * Worker sandbox. First-party, in-process plugins that use only this API are the target.
  */
 
 export const SAMVAD_PLUGIN_API = '0.1.0'
@@ -43,6 +44,27 @@ export type TileParticipant = {
   isSelf: boolean
 }
 
+/** Options when registering a media-track transform. Lower `order` runs first (reserved). */
+export type TransformOptions = { order?: number }
+
+/**
+ * A media-track transform: given the raw camera (or mic) track, return a processed one.
+ * Backs both the `video-transform` and `audio-transform` capabilities. The plugin owns the
+ * whole pipeline and may run a Web Worker internally; the host just publishes the returned
+ * track in place of the raw one. Register only while the effect is actually wanted and
+ * unregister to turn it off — the host reverts to the raw track when nothing is registered,
+ * so an idle plugin costs nothing.
+ */
+export interface TrackTransform {
+  /**
+   * Begin processing `input` and return the track to publish. Return synchronously so there's
+   * no gap; if a model must load, show raw passthrough on the returned track until it's ready.
+   */
+  start(input: MediaStreamTrack): MediaStreamTrack | Promise<MediaStreamTrack>
+  /** Stop and release everything. The host reverts to the raw track. */
+  stop(): void
+}
+
 /** A room lifecycle event a plugin can observe (with the `lifecycle` capability). */
 export type LifecycleEvent =
   | { type: 'joined'; id: string; name: string }
@@ -71,6 +93,20 @@ export interface PluginContext {
     registerToolbarControl(component: ComponentType): void
     registerTileOverlay(component: ComponentType<{ participant: TileParticipant }>): void
     registerStageOverlay(component: ComponentType): void
+    /** Contribute a section to the Settings dialog (needs the `settings` UI slot). */
+    registerSettingsPanel(component: ComponentType): void
+  }
+
+  /**
+   * Present iff the plugin declared a `video-transform` and/or `audio-transform` capability.
+   * Registering returns an unregister fn — call it to turn the effect off (the host then
+   * publishes the raw track again).
+   */
+  media?: {
+    /** Transform the local camera track (needs `video-transform`). Returns an unregister fn. */
+    registerVideoTransform(transform: TrackTransform, opts?: TransformOptions): () => void
+    /** Transform the local mic track (needs `audio-transform`). Returns an unregister fn. */
+    registerAudioTransform(transform: TrackTransform, opts?: TransformOptions): () => void
   }
 
   /** Present iff the plugin declared a `lifecycle` capability. */
