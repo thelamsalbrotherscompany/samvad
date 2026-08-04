@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import type { ComponentType, ReactNode } from 'react'
 import type { Capability, PluginContext, SamvadPlugin, TileParticipant } from './types'
 import { useSettingsRegistry } from './settingsRegistry'
+import { makeNet, makeStorage } from './capabilityServices'
 
 /**
  * Loads plugins and exposes what they register — nothing more. Each plugin's `setup`
@@ -61,6 +62,11 @@ export function PluginHost({
       )
 
       const ctx: PluginContext = { selfId, selfName }
+
+      const storage = makeStorage(plugin)
+      if (storage) ctx.storage = storage
+      const net = makeNet(plugin)
+      if (net) ctx.net = net
 
       if (dataCap) {
         // Namespaced by plugin id, so plugins can't read each other's traffic.

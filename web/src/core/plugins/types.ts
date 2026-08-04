@@ -71,6 +71,28 @@ export type LifecycleEvent =
   | { type: 'left'; id: string; name: string }
 
 /**
+ * Per-plugin key/value storage (the `storage` capability). Keys are namespaced by plugin id
+ * so plugins can't read each other's, and it's backed by `sessionStorage` — it dies with the
+ * tab, matching Samvad's "the server forgets, and so does the client" model. Convenience,
+ * gated: a plugin without the capability has no `ctx.storage`.
+ */
+export type PluginStorage = {
+  get(key: string): string | null
+  set(key: string, value: string): void
+  remove(key: string): void
+}
+
+/**
+ * Network access restricted to a plugin's declared origins (the `network` capability). Use
+ * this rather than the ambient `fetch` so a plugin is portable to the coming Worker sandbox,
+ * where ambient `fetch` is removed and only this — checked against the manifest — is allowed.
+ * Reaching an undeclared origin rejects.
+ */
+export type PluginNet = {
+  fetch(input: string, init?: RequestInit): Promise<Response>
+}
+
+/**
  * What a plugin's `setup` receives. Every method is capability-gated: calling one the
  * plugin didn't declare throws. Only granted sub-APIs are attached.
  */
@@ -108,6 +130,12 @@ export interface PluginContext {
     /** Transform the local mic track (needs `audio-transform`). Returns an unregister fn. */
     registerAudioTransform(transform: TrackTransform, opts?: TransformOptions): () => void
   }
+
+  /** Present iff the plugin declared a `storage` capability. Namespaced, tab-lifetime. */
+  storage?: PluginStorage
+
+  /** Present iff the plugin declared a `network` capability. Restricted to its origins. */
+  net?: PluginNet
 
   /** Present iff the plugin declared a `lifecycle` capability. */
   lifecycle?: {

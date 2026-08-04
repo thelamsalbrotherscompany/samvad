@@ -71,9 +71,11 @@ useful on its own terms, even with everything below unbuilt.
   (toolbar, tile-overlay, stage-overlay, **settings**), **E2EE data topics** (namespaced per
   plugin, over the same P2P channel as media), and **`video-transform` / `audio-transform`**
   via a **media-plugin host** (`web/src/core/media/mediaPlugins.ts`) that runs from pre-join.
-  ⚠️ First-party, **in-process** for now — the Worker sandbox that strips `fetch`/etc. from
-  untrusted plugins, manifest integrity hashes, and `network`/`storage` enforcement are
-  declared in the types but not yet enforced (Phase 6 / see below)
+  plus gated **`storage`** (`ctx.storage`, namespaced + tab-lifetime) and **`network`**
+  (`ctx.net.fetch`, origin-restricted) sub-APIs. ⚠️ First-party, **in-process** for now, so
+  `storage`/`network` gating is a *convention and portability shim, not a hard boundary* — a
+  plugin still has ambient `fetch`/`localStorage`. Real isolation (the Worker realm that
+  strips those globals, manifest integrity hashes, and URL loading) is **Phase 6**
 - ✅ **Media pipeline**: a generic video-transform pipeline in core applies whatever
   `TrackTransform` a plugin registers (raw track when none), and MediaPipe **segmentation runs
   in a Web Worker** (`plugins/background/segmenter.worker.ts`) — inference and the O(pixels)

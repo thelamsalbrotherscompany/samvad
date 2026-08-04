@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { create } from 'zustand'
 import type { Capability, PluginContext, SamvadPlugin, TrackTransform } from '@/core/plugins/types'
 import { useSettingsRegistry } from '@/core/plugins/settingsRegistry'
+import { makeNet, makeStorage } from '@/core/plugins/capabilityServices'
 
 /**
  * The **media-plugin host**: the counterpart to {@link PluginHost} for the
@@ -52,6 +53,11 @@ export function useMediaPlugins(plugins: readonly SamvadPlugin[]): void {
       )
 
       const ctx: PluginContext = { selfId: 'self', selfName: '' }
+
+      const storage = makeStorage(plugin)
+      if (storage) ctx.storage = storage
+      const net = makeNet(plugin)
+      if (net) ctx.net = net
 
       if (hasVideo || hasAudio) {
         ctx.media = {

@@ -25,8 +25,16 @@ chat are both plugins — so the API stays honest.
 | `video-transform` / `audio-transform` | ✅ | a `TrackTransform` via `ctx.media`; runs from pre-join |
 | `ui` → `sidebar` | ⛔ | slot name exists; not mounted yet (use `toolbar` + your own panel) |
 | `lifecycle` | ⛔ | declared in the types; not yet delivered to plugins |
-| `storage` / `network` | ⛔ | not implemented (and `network` will require user consent) |
+| `storage` | ⚠️ | `ctx.storage` — namespaced, `sessionStorage`-backed (tab-lifetime). Gated, but a *convention* in-process (see below) |
+| `network` | ⚠️ | `ctx.net.fetch` — restricted to declared origins. Gated, but a *convention* in-process; consent UI is future |
 | Worker sandbox / integrity / URL loading | ⛔ | first-party, in-process only for now |
+
+> **Honest limit:** because plugins run **in-process**, `storage`/`network` gating is a
+> *convention and a portability shim, not a boundary* — a plugin still has ambient `fetch` /
+> `localStorage`. Use `ctx.storage` / `ctx.net` anyway: they namespace/origin-restrict your
+> code so it's ready for the Worker sandbox (Phase 6), where the ambient globals are removed
+> and only these — checked against your manifest — work. Until then, only run plugins you'd
+> trust as source.
 
 Plugins currently run **in-process** and are **registered in code** (an array in the app),
 not loaded from a URL. That's enough to build and ship first-party features through the
