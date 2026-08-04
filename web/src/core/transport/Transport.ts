@@ -52,6 +52,8 @@ export type TransportHandlers = {
   onActivity: (e: ActivityEvent) => void
   /** The real, current encryption mode of the media path. */
   onEncryption: (mode: EncryptionMode) => void
+  /** The host asked everyone to mute — the app mutes this client's own mic. */
+  onForceMute: () => void
 }
 
 /**
@@ -71,6 +73,10 @@ export interface Transport {
   deny(id: string): void
   setLobbyOpen(open: boolean): void
   kick(id: string): void
+  /** Host: ask everyone else to mute their mic. */
+  muteAll(): void
+  /** Host: hand the host role to another participant. */
+  makeHost(id: string): void
   end(): void
   /** Send plugin data on a topic — to the whole room or one peer. E2EE, never via server. */
   sendData(topic: string, payload: unknown, opts?: { to?: string }): void

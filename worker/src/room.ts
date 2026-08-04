@@ -171,6 +171,32 @@ export class RoomDO {
         break
       }
 
+      case 'mute-all': {
+        if (ws !== this.hostSocket()) return
+        // A request every other client honours by muting its own mic — the server never
+        // touches anyone's hardware.
+        this.broadcastAdmitted(ws, { type: 'force-mute' })
+        break
+      }
+
+      case 'make-host': {
+        if (ws !== this.hostSocket()) return
+        const target = this.socketById(msg.id)
+        const ta = target ? this.attachmentOf(target) : null
+        if (!target || !ta || target === ws || ta.status !== 'admitted') return
+        // Host is the earliest-admitted socket; make the target earliest so it becomes host.
+        let earliest = Date.now()
+        for (const s of this.admittedSockets()) {
+          const a = this.attachmentOf(s)
+          if (a) earliest = Math.min(earliest, a.admittedAt)
+        }
+        ta.admittedAt = earliest - 1
+        target.serializeAttachment(ta)
+        this.send(target, { type: 'role', isHost: true })
+        this.send(ws, { type: 'role', isHost: false })
+        break
+      }
+
       case 'end': {
         if (ws !== this.hostSocket()) return
         for (const other of this.sockets()) {

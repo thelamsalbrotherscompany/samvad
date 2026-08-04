@@ -202,6 +202,16 @@ export class MeshTransport implements Transport {
     this.sendToServer({ type: 'kick', id })
   }
 
+  /** Host: ask everyone else to mute their mic. */
+  muteAll(): void {
+    this.sendToServer({ type: 'mute-all' })
+  }
+
+  /** Host: hand the host role to another participant. */
+  makeHost(id: string): void {
+    this.sendToServer({ type: 'make-host', id })
+  }
+
   /** Host: end the meeting for everyone. */
   end(): void {
     this.sendToServer({ type: 'end' })
@@ -325,6 +335,10 @@ export class MeshTransport implements Transport {
       case 'kicked':
         this.terminated = true
         this.handlers.onPhase('removed')
+        break
+
+      case 'force-mute':
+        this.handlers.onForceMute()
         break
 
       case 'ended':

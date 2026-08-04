@@ -27,6 +27,8 @@ type Options = {
   muted: boolean
   cameraOff: boolean
   handRaised: boolean
+  /** Called when the host asks everyone to mute — the app mutes this client's own mic. */
+  onForceMute: () => void
 }
 
 export type Mesh = {
@@ -43,6 +45,10 @@ export type Mesh = {
   deny: (id: string) => void
   setLobbyOpen: (open: boolean) => void
   kick: (id: string) => void
+  /** Host: ask everyone else to mute their mic. */
+  muteAll: () => void
+  /** Host: hand the host role to another participant. */
+  makeHost: (id: string) => void
   end: () => void
   /** Send plugin data on a topic (whole room, or one peer). E2EE, P2P. */
   sendData: (topic: string, payload: unknown, opts?: { to?: string }) => void
@@ -70,6 +76,9 @@ export function useMesh(opts: Options): Mesh {
   // Plugin topic subscribers, kept in a ref so the transport's onData handler (set once at
   // construction) always dispatches to the current set.
   const subscribersRef = useRef(new Map<string, Set<DataHandler>>())
+  // The force-mute callback, in a ref so the transport (wired once) always calls the current one.
+  const onForceMuteRef = useRef(opts.onForceMute)
+  onForceMuteRef.current = opts.onForceMute
 
   useEffect(() => {
     if (!opts.enabled) return
@@ -94,6 +103,7 @@ export function useMesh(opts: Options): Mesh {
       },
       onActivity: (e: ActivityEvent) => setActivity((prev) => [...prev, e]),
       onEncryption: setEncryption,
+      onForceMute: () => onForceMuteRef.current(),
     }
     // Same constructor shape, so selection is the only line that knows the difference.
     const Ctor = opts.transport === 'sfu' ? PionTransport : MeshTransport
@@ -148,6 +158,8 @@ export function useMesh(opts: Options): Mesh {
   const deny = useCallback((id: string) => ref.current?.deny(id), [])
   const setLobbyOpen = useCallback((open: boolean) => ref.current?.setLobbyOpen(open), [])
   const kick = useCallback((id: string) => ref.current?.kick(id), [])
+  const muteAll = useCallback(() => ref.current?.muteAll(), [])
+  const makeHost = useCallback((id: string) => ref.current?.makeHost(id), [])
   const end = useCallback(() => ref.current?.end(), [])
   const sendData = useCallback(
     (topic: string, payload: unknown, opts?: { to?: string }) =>
@@ -181,6 +193,8 @@ export function useMesh(opts: Options): Mesh {
     deny,
     setLobbyOpen,
     kick,
+    muteAll,
+    makeHost,
     end,
     sendData,
     subscribeData,

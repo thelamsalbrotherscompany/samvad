@@ -7,6 +7,7 @@ import {
   MicOffIcon,
   RemoveUserIcon,
   SearchIcon,
+  ShieldIcon,
   VideoOffIcon,
 } from '@/design/icons'
 import { initialsOf, type Participant } from '@/core/participants'
@@ -23,6 +24,10 @@ type Props = {
   onSetLobbyOpen: (open: boolean) => void
   /** Host: remove a participant. Absent for non-hosts. */
   onRemove?: (id: string) => void
+  /** Host: ask everyone to mute their mic. */
+  onMuteAll?: () => void
+  /** Host: hand the host role to another participant. */
+  onMakeHost?: (id: string) => void
 }
 
 type Tab = 'people' | 'activity'
@@ -41,6 +46,8 @@ export function ParticipantsPanel({
   lobbyOpen,
   onSetLobbyOpen,
   onRemove,
+  onMuteAll,
+  onMakeHost,
 }: Props) {
   const [tab, setTab] = useState<Tab>('people')
   const [query, setQuery] = useState('')
@@ -111,6 +118,16 @@ export function ParticipantsPanel({
                 </div>
               )}
 
+              {isHost && onMuteAll && participants.length > 1 && (
+                <button
+                  onClick={onMuteAll}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface-2/40 py-2.5 text-[13px] font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+                >
+                  <MicOffIcon className="size-4" />
+                  Mute everyone
+                </button>
+              )}
+
               <div className="relative mt-4 shrink-0">
                 <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-faint" />
                 <input
@@ -140,6 +157,16 @@ export function ParticipantsPanel({
                       {p.muted && <MicOffIcon className="size-4" />}
                       {p.cameraOff && <VideoOffIcon className="size-4" />}
                     </div>
+                    {isHost && onMakeHost && !p.isSelf && (
+                      <button
+                        onClick={() => onMakeHost(p.id)}
+                        aria-label={`Make ${p.name} the host`}
+                        title="Make host"
+                        className="grid size-8 shrink-0 place-items-center rounded-full text-ink-faint transition-colors hover:bg-surface-2 hover:text-accent"
+                      >
+                        <ShieldIcon className="size-4" />
+                      </button>
+                    )}
                     {isHost && onRemove && !p.isSelf && (
                       <button
                         onClick={() => onRemove(p.id)}

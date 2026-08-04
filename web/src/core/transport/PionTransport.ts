@@ -189,6 +189,10 @@ export class PionTransport implements Transport {
         this.terminated = true
         this.handlers.onPhase('removed')
         break
+
+      case 'force-mute':
+        this.handlers.onForceMute()
+        break
       case 'ended':
         this.terminated = true
         this.handlers.onPhase('ended')
@@ -484,6 +488,14 @@ export class PionTransport implements Transport {
 
   kick(id: string): void {
     this.sendToServer({ type: 'kick', id })
+  }
+
+  muteAll(): void {
+    this.sendToServer({ type: 'mute-all' })
+  }
+
+  makeHost(id: string): void {
+    this.sendToServer({ type: 'make-host', id })
   }
 
   end(): void {

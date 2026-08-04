@@ -39,6 +39,8 @@ export type ClientMessage =
   | { type: 'deny'; id: string }
   | { type: 'set-lobby'; open: boolean }
   | { type: 'kick'; id: string }
+  | { type: 'mute-all' } // host only: ask every other admitted participant to mute
+  | { type: 'make-host'; id: string } // host only: hand the host role to another participant
   | { type: 'end' }
 
 /** Durable Object → browser. */
@@ -47,6 +49,7 @@ export type ServerMessage =
   | { type: 'waiting' }
   | { type: 'denied' }
   | { type: 'kicked' }
+  | { type: 'force-mute' } // the host asked everyone to mute; the client mutes its own mic
   | { type: 'ended' }
   | { type: 'not-found' }
   | { type: 'lobby'; open: boolean }

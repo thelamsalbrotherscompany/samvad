@@ -160,6 +160,8 @@ export default function App() {
     muted,
     cameraOff,
     handRaised,
+    // The host asked everyone to mute — honour it by muting our own mic.
+    onForceMute: () => media.setMicOn(false),
   })
   const phase = mesh.phase // 'connecting' | 'waiting' | 'admitted' | 'denied'
 
@@ -457,6 +459,8 @@ export default function App() {
             lobbyOpen={mesh.lobbyOpen}
             onSetLobbyOpen={mesh.setLobbyOpen}
             onRemove={mesh.kick}
+            onMuteAll={mesh.muteAll}
+            onMakeHost={mesh.makeHost}
           />
         )}
 

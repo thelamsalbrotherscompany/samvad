@@ -52,6 +52,8 @@ export type ClientMessage =
   | { type: 'deny'; id: string } // host only
   | { type: 'set-lobby'; open: boolean } // host only: open = anyone with the link joins
   | { type: 'kick'; id: string } // host only
+  | { type: 'mute-all' } // host only: ask every other admitted participant to mute their mic
+  | { type: 'make-host'; id: string } // host only: hand the host role to another participant
   | { type: 'end' } // host only: close the room for everyone
 
 /** Durable Object → browser. */
@@ -65,6 +67,9 @@ export type ServerMessage =
   | { type: 'denied' }
   // The host removed you from the call; your socket will close.
   | { type: 'kicked' }
+  // The host asked everyone to mute — the client mutes its own mic (a request it honours,
+  // never a server reaching into your hardware).
+  | { type: 'force-mute' }
   // The host ended the meeting for everyone; your socket will close.
   | { type: 'ended' }
   // You tried to join a room that doesn't exist (no one has created it); socket closes.
