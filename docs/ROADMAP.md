@@ -195,11 +195,17 @@ confirm end-to-end — see `selfhost/README`.)*
 
 ## Phase 5 — Classroom scale
 
-- Classroom mode: one presenter publishes video; participants are audio-first
-- Hand-raise, speaking queue, presenter handoff
-- Moderation: mute-all, remove, lock room, waiting room
-- Pagination for large grids
-- Adaptive quality on constrained downlinks
+- ⏳ Classroom mode: one presenter publishes video; participants are audio-first
+- ✅ **Hand-raise, speaking queue, presenter handoff** — hand-raise + an **ordered queue** the
+  host works through (with host lower-hand), and **presenter handoff** (transfer the host role,
+  which on the SFU also transfers the MLS committer). Both are host→DO commands, so they work on
+  mesh and the SFU alike
+- ✅ **Moderation: mute-all, remove, lock room, waiting room** — **mute everyone** (a request each
+  client honours; the server never touches hardware), **remove** (kick), the **lobby** lock
+  (approve each guest) and **waiting room** all shipped
+- ✅ **Pagination for large grids** — the gallery paginates (‹ Page 2 / 4 ›) so you can page
+  through everyone instead of hitting a dead "+N" cell
+- ⏳ Adaptive quality on constrained downlinks — needs the SFU's simulcast layer selection
 
 **Done when:** a 40-person class runs for an hour without intervention.
 
