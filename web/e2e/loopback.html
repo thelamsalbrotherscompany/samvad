@@ -1,0 +1,125 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Samvad E2EE loopback</title>
+  </head>
+  <body>
+    <pre id="r">running…</pre>
+    <script type="module">
+      // Imports the REAL frame cipher from source (Vite transpiles it). This page is driven
+      // headless by e2e/loopback.mjs; see e2e/README.md.
+      import { FrameCryptor } from '/src/core/crypto/frameCrypto'
+
+      const out = (o) => {
+        document.getElementById('r').textContent = JSON.stringify(o, null, 2)
+        window.__result = o
+        window.__done = true
+      }
+
+      ;(async () => {
+        const secret = new Uint8Array(32).fill(7)
+        const wrong = new Uint8Array(32).fill(9)
+
+        // One sender cipher, a correct-key receiver, and a wrong-key receiver — all the real
+        // FrameCryptor. Two independent loopbacks let us assert both the positive and the
+        // negative in one run.
+        const txC = new FrameCryptor()
+        await txC.setEpochSecret(1, secret)
+        const rxGood = new FrameCryptor()
+        await rxGood.setEpochSecret(1, secret)
+        const rxBad = new FrameCryptor()
+        await rxBad.setEpochSecret(1, wrong)
+
+        const cfg = { encodedInsertableStreams: true }
+        const pcA1 = new RTCPeerConnection(cfg)
+        const pcGood = new RTCPeerConnection(cfg)
+        const pcA2 = new RTCPeerConnection(cfg)
+        const pcBad = new RTCPeerConnection(cfg)
+        wire(pcA1, pcGood)
+        wire(pcA2, pcBad)
+
+        let enc = 0
+        let decGood = 0
+        let decBad = 0
+        const count = (bump) => new TransformStream({ transform(f, c) { bump(); c.enqueue(f) } })
+
+        // Animated canvas as the video source — no camera / getUserMedia needed.
+        const canvas = document.createElement('canvas')
+        canvas.width = 320
+        canvas.height = 240
+        const cx = canvas.getContext('2d')
+        let t = 0
+        setInterval(() => {
+          t++
+          cx.fillStyle = `hsl(${t % 360},80%,50%)`
+          cx.fillRect(0, 0, 320, 240)
+          cx.fillStyle = '#fff'
+          cx.font = '48px sans-serif'
+          cx.fillText(String(t), 20, 130)
+        }, 33)
+        const srcStream = canvas.captureStream(30)
+
+        attachSender(pcA1, txC)
+        attachSender(pcA2, txC)
+
+        let vGood
+        let vBad
+        pcGood.ontrack = (e) => {
+          attachReceiver(e.receiver, rxGood, () => decGood++)
+          vGood = show(e)
+        }
+        pcBad.ontrack = (e) => {
+          attachReceiver(e.receiver, rxBad, () => decBad++)
+          vBad = show(e)
+        }
+
+        await negotiate(pcA1, pcGood)
+        await negotiate(pcA2, pcBad)
+
+        setTimeout(() => {
+          out({
+            ok: true,
+            encryptedFramesSent: enc,
+            decryptedFrames_correctKey: decGood,
+            decryptedFrames_wrongKey: decBad,
+            video_correctKey: { w: vGood?.videoWidth || 0, playing: (vGood?.currentTime || 0) > 0 },
+            video_wrongKey: { w: vBad?.videoWidth || 0, playing: (vBad?.currentTime || 0) > 0 },
+            connState: pcA1.connectionState,
+          })
+        }, 5000)
+
+        function attachSender(pc, cryptor) {
+          const sender = pc.addTrack(srcStream.getVideoTracks()[0], srcStream)
+          const s = sender.createEncodedStreams()
+          s.readable.pipeThrough(cryptor.encryptStream()).pipeThrough(count(() => enc++)).pipeTo(s.writable)
+        }
+        function attachReceiver(receiver, cryptor, bump) {
+          const s = receiver.createEncodedStreams()
+          s.readable.pipeThrough(cryptor.decryptStream()).pipeThrough(count(bump)).pipeTo(s.writable)
+        }
+        function show(e) {
+          const v = document.createElement('video')
+          v.autoplay = true
+          v.muted = true
+          v.playsInline = true
+          v.srcObject = e.streams[0] || new MediaStream([e.track])
+          document.body.appendChild(v)
+          return v
+        }
+        function wire(a, b) {
+          a.onicecandidate = (e) => e.candidate && b.addIceCandidate(e.candidate.toJSON())
+          b.onicecandidate = (e) => e.candidate && a.addIceCandidate(e.candidate.toJSON())
+        }
+        async function negotiate(a, b) {
+          const offer = await a.createOffer()
+          await a.setLocalDescription(offer)
+          await b.setRemoteDescription(offer)
+          const answer = await b.createAnswer()
+          await b.setLocalDescription(answer)
+          await a.setRemoteDescription(answer)
+        }
+      })().catch((e) => out({ ok: false, error: String((e && e.stack) || e) }))
+    </script>
+  </body>
+</html>
