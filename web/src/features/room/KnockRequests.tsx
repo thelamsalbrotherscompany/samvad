@@ -18,7 +18,12 @@ export function KnockRequests({
   if (knocks.length === 0) return null
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-4 z-40 flex flex-col items-center gap-2 px-4">
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label="People waiting to join"
+      className="pointer-events-none absolute inset-x-0 top-4 z-40 flex flex-col items-center gap-2 px-4"
+    >
       {knocks.map((k) => (
         <div
           key={k.id}

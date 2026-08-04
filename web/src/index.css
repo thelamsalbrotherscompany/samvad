@@ -22,7 +22,9 @@
   /* Text — warm off-white; pure #fff is harsh on dark. */
   --color-ink: #f5f0ea;
   --color-ink-muted: #a69b90;
-  --color-ink-faint: #6b625a;
+  /* Faint tier, lifted to meet WCAG AA (4.5:1) on base + surface — was #6b625a (~2.9:1,
+     failed). Still clearly below ink-muted, so the hierarchy holds. */
+  --color-ink-faint: #8d8479;
 
   /* Accents — marigold earns attention by being rare. */
   --color-accent: #e8a33d;

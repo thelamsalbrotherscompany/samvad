@@ -59,7 +59,12 @@ export function ChatPanel({ open, onOpenChange, messages, onSend }: Props) {
             End-to-end encrypted, peer-to-peer chat for this room
           </Dialog.Description>
 
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
+          <div
+            role="log"
+            aria-live="polite"
+            aria-label="Messages"
+            className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4"
+          >
             {messages.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-1.5 px-6 text-center">
                 <p className="text-[14px] text-ink-muted">No messages yet</p>
@@ -86,6 +91,7 @@ export function ChatPanel({ open, onOpenChange, messages, onSend }: Props) {
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={onKeyDown}
                 rows={1}
+                aria-label="Message"
                 placeholder="Message…"
                 className="max-h-28 min-h-10 flex-1 resize-none rounded-xl border border-line bg-surface-2/50 px-3.5 py-2.5 text-[14px] text-ink placeholder:text-ink-faint focus:border-accent/60 focus:outline-none"
               />

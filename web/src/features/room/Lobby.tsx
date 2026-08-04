@@ -59,7 +59,8 @@ export function Lobby({
           </div>
         )}
 
-        <h2 className="mt-3 text-[22px] font-semibold">
+        {/* Announce the phase (connecting → waiting → denied/removed/ended/not-found). */}
+        <h2 role="status" aria-live="polite" className="mt-3 text-[22px] font-semibold">
           {variant === 'connecting'
             ? 'Joining the room'
             : variant === 'waiting'

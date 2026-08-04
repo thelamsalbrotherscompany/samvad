@@ -24,7 +24,7 @@ export function ChatToolbar() {
   return (
     <>
       <button
-        aria-label="Chat"
+        aria-label={unread > 0 ? `Chat, ${unread} unread` : 'Chat'}
         onClick={() => setOpen(true)}
         className="relative inline-grid size-10 place-items-center rounded-full text-ink-muted transition-all duration-200 ease-out hover:bg-surface-2 hover:text-ink active:scale-95"
       >

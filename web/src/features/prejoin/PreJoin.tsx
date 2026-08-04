@@ -90,9 +90,9 @@ export function PreJoin({
             }}
           >
             {showVideo && stream ? (
-              <VideoView stream={stream} className="size-full" style={selfVideoStyle(settings)} />
+              <VideoView stream={stream} label="Your camera preview" className="size-full" style={selfVideoStyle(settings)} />
             ) : mediaError ? (
-              <div className="grid size-full place-items-center px-6 text-center">
+              <div role="alert" className="grid size-full place-items-center px-6 text-center">
                 <div className="flex max-w-xs flex-col items-center gap-3">
                   <span className="grid size-16 place-items-center rounded-full bg-surface-2 text-ink-muted">
                     <VideoOffIcon className="size-7" />

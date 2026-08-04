@@ -7,13 +7,15 @@ type Props = {
   style?: CSSProperties
   /** Always true for self-view (no echo); remote audio plays elsewhere. */
   muted?: boolean
+  /** Accessible name for the video (e.g. "Sangam's camera"), so it isn't an unnamed region. */
+  label?: string
 }
 
 /**
  * Binds a MediaStream to a <video> element. `srcObject` can't be set via JSX, so it's
  * assigned imperatively. Always muted + playsInline + autoPlay for a call surface.
  */
-export function VideoView({ stream, className, style, muted = true }: Props) {
+export function VideoView({ stream, className, style, muted = true, label }: Props) {
   const ref = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
@@ -27,6 +29,7 @@ export function VideoView({ stream, className, style, muted = true }: Props) {
       autoPlay
       playsInline
       muted={muted}
+      aria-label={label}
       className={className}
       style={style}
     />

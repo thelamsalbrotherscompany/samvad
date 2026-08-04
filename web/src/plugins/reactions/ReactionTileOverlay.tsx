@@ -12,8 +12,13 @@ export function ReactionTileOverlay({ participant }: { participant: TileParticip
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-10 z-10 flex justify-center">
+      {/* The emoji is decorative to a screen reader; announce it in words instead. */}
+      <span className="sr-only" role="status" aria-live="polite">
+        {participant.isSelf ? 'You' : participant.name} reacted {active.emoji}
+      </span>
       <span
         key={active.key}
+        aria-hidden="true"
         className="drop-shadow-lg"
         style={{
           fontSize: 'min(20cqmin, 52px)',

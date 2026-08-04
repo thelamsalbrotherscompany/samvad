@@ -94,6 +94,7 @@ export function ParticipantsPanel({
               <button
                 key={t}
                 onClick={() => setTab(t)}
+                aria-pressed={tab === t}
                 className={cn(
                   'flex-1 rounded-lg py-1.5 text-[13px] font-medium transition-colors',
                   tab === t
@@ -241,6 +242,7 @@ export function ParticipantsPanel({
                   <button
                     key={f}
                     onClick={() => setActivityFilter(f)}
+                    aria-pressed={activityFilter === f}
                     className={cn(
                       'rounded-lg px-3 py-1 text-[12px] font-medium capitalize transition-colors',
                       activityFilter === f

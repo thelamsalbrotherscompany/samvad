@@ -118,7 +118,7 @@ export function SettingsDialog({
             }}
           >
             {showVideo && stream ? (
-              <VideoView stream={stream} className="size-full" style={selfVideoStyle(settings)} />
+              <VideoView stream={stream} label="Your camera preview" className="size-full" style={selfVideoStyle(settings)} />
             ) : (
               <div className="grid size-full place-items-center">
                 <span className="text-6xl font-semibold text-ink/12 select-none">
@@ -318,6 +318,7 @@ function DeviceSelect({
       value={value ?? devices[0]?.deviceId ?? ''}
       onValueChange={onChange}
       items={items}
+      label={fallback}
     />
   )
 }

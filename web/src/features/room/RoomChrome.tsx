@@ -47,9 +47,11 @@ export function RoomChrome({
       {/* Attention requests surface here, centrally, so they're seen no matter how
           many tiles are on the stage — a corner badge alone gets lost in a crowd. */}
       {hands > 0 && (
-        <div className="absolute left-1/2 top-4 -translate-x-1/2">
+        <div role="status" aria-live="polite" className="absolute left-1/2 top-4 -translate-x-1/2">
           <Hint label={raisedHands.join(', ')}>
             <div
+              // Names live only in the tooltip, unreachable by keyboard/SR — expose them here.
+              aria-label={`${hands} ${hands === 1 ? 'hand' : 'hands'} raised: ${raisedHands.join(', ')}`}
               className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-base shadow-lg"
               style={{ animation: 'samvad-attention 2.4s ease-in-out infinite' }}
             >
@@ -70,7 +72,7 @@ export function RoomChrome({
         <Hint label={copied ? 'Copied' : 'Copy invite link'}>
           <button
             onClick={copyLink}
-            aria-label="Copy invite link"
+            aria-label={copied ? 'Invite link copied' : 'Copy invite link'}
             className="grid size-7 place-items-center rounded-full text-ink-muted transition-colors duration-200 hover:bg-surface-2 hover:text-ink"
           >
             {copied ? (
@@ -97,9 +99,13 @@ export function RoomChrome({
           <span className="text-[13px] font-medium tabular-nums">{count}</span>
         </div>
 
-        {/* Privacy state is always on screen — quiet when normal, loud when not. */}
+        {/* Privacy state is always on screen — quiet when normal, loud when not. It's
+            icon-only on a phone, so name it (label + detail) and announce a change. */}
         <Hint label={copy.detail}>
           <div
+            role="status"
+            aria-live="polite"
+            aria-label={`${copy.label}. ${copy.detail}`}
             className={cn(
               'flex items-center gap-1.5 rounded-full border px-3 py-1.5 backdrop-blur-2xl',
               secure
@@ -108,7 +114,6 @@ export function RoomChrome({
             )}
           >
             <ShieldIcon className="size-4 shrink-0" />
-            {/* Icon-only on a phone, where horizontal space is scarce. */}
             <span className="hidden text-[13px] font-medium sm:inline">{copy.label}</span>
           </div>
         </Hint>

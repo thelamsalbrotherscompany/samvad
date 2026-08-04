@@ -21,7 +21,11 @@ export function ScreenShareTile({
       style={{ animation: 'samvad-rise 400ms var(--ease-settle) both' }}
     >
       {stream ? (
-        <VideoView stream={stream} className="size-full object-contain" />
+        <VideoView
+          stream={stream}
+          label={isSelf ? 'Your shared screen' : `${presenterName}'s shared screen`}
+          className="size-full object-contain"
+        />
       ) : (
         <div
           className="grid size-full place-items-center"

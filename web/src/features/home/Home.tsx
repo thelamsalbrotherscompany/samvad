@@ -83,6 +83,7 @@ export function Home({
             autoCapitalize="off"
             autoCorrect="off"
             spellCheck={false}
+            aria-label="Room code or invite link"
             placeholder="room code or link"
             className="min-w-0 flex-1 bg-transparent font-mono text-[14px] text-ink outline-none placeholder:font-sans placeholder:text-ink-faint"
           />
@@ -97,7 +98,7 @@ export function Home({
         </div>
 
         {invalid && (
-          <p className="mt-2 text-[12px] text-danger">
+          <p role="alert" className="mt-2 text-[12px] text-danger">
             That doesn't look like a room code — paste the invite link or the code from it.
           </p>
         )}

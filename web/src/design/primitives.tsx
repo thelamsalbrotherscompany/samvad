@@ -15,15 +15,21 @@ export function Select({
   onValueChange,
   items,
   placeholder,
+  label,
 }: {
   value: string
   onValueChange: (value: string) => void
   items: { value: string; label: string }[]
   placeholder?: string
+  /** Accessible name — without it two like-named options (e.g. two mics) read ambiguously. */
+  label?: string
 }) {
   return (
     <RadixSelect.Root value={value} onValueChange={onValueChange}>
-      <RadixSelect.Trigger className="inline-flex h-9 w-full items-center justify-between gap-2 overflow-hidden rounded-lg border border-line bg-surface-2 px-2.5 text-[13px] text-ink outline-none focus:border-accent/60">
+      <RadixSelect.Trigger
+        aria-label={label}
+        className="inline-flex h-9 w-full items-center justify-between gap-2 overflow-hidden rounded-lg border border-line bg-surface-2 px-2.5 text-[13px] text-ink outline-none focus:border-accent/60"
+      >
         <span className="truncate">
           <RadixSelect.Value placeholder={placeholder} />
         </span>
@@ -163,7 +169,7 @@ type ControlProps = ButtonHTMLAttributes<HTMLButtonElement> & {
  */
 export function ControlButton({
   label,
-  active = false,
+  active,
   activeTone = 'danger',
   tone = 'neutral',
   size = 'lg',
@@ -175,7 +181,8 @@ export function ControlButton({
     <Hint label={label}>
       <button
         aria-label={label}
-        aria-pressed={tone === 'danger' ? undefined : active}
+        // Only a real toggle announces pressed state; a one-shot action (no `active`) doesn't.
+        aria-pressed={tone === 'danger' || active === undefined ? undefined : active}
         className={cn(
           'inline-grid place-items-center rounded-full transition-all duration-200 ease-out',
           'active:scale-95',

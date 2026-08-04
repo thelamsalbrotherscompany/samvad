@@ -498,7 +498,11 @@ export default function App() {
 /** Shown while the signalling socket is down and the transport is retrying. */
 function ReconnectingBanner() {
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-0 z-50 flex justify-center pt-4">
+    <div
+      role="status"
+      aria-live="assertive"
+      className="pointer-events-none absolute inset-x-0 top-0 z-50 flex justify-center pt-4"
+    >
       <div className="flex items-center gap-2.5 rounded-full border border-line/80 bg-surface/90 px-4 py-2 shadow-xl backdrop-blur-2xl">
         <span className="size-2 animate-ping rounded-full bg-accent" />
         <span className="text-[13px] font-medium text-ink">Reconnecting…</span>

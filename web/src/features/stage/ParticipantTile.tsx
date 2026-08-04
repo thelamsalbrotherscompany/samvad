@@ -49,6 +49,7 @@ export function ParticipantTile({ participant, compact = false }: Props) {
         // The mirror flip lives on the <video> frame — never on text (see shouldMirror).
         <VideoView
           stream={stream}
+          label={isSelf ? 'Your camera' : `${name}'s camera`}
           className="size-full"
           style={{
             objectFit: 'cover',

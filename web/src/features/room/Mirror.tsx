@@ -62,6 +62,14 @@ export function Mirror({
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
+  // This is a hand-rolled modal, so move focus into it on open and restore it on close, so
+  // keyboard/screen-reader users aren't left on the now-obscured page behind it.
+  useEffect(() => {
+    const prev = document.activeElement as HTMLElement | null
+    rootRef.current?.focus()
+    return () => prev?.focus?.()
+  }, [])
+
   function toggleFullscreen() {
     if (document.fullscreenElement) {
       void document.exitFullscreen().catch(() => {})
@@ -80,7 +88,11 @@ export function Mirror({
   return (
     <div
       ref={rootRef}
-      className="fixed inset-0 z-60 flex flex-col bg-base p-4 sm:p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Camera preview"
+      tabIndex={-1}
+      className="fixed inset-0 z-60 flex flex-col bg-base p-4 outline-none sm:p-6"
       style={{ animation: 'samvad-rise 240ms var(--ease-settle) both' }}
     >
       <div className="flex items-center justify-between">
@@ -113,7 +125,7 @@ export function Mirror({
           }}
         >
           {showVideo && stream ? (
-            <VideoView stream={stream} className="size-full" style={selfVideoStyle(settings)} />
+            <VideoView stream={stream} label="Your camera" className="size-full" style={selfVideoStyle(settings)} />
           ) : (
             <div className="grid size-full place-items-center">
               {cameraOff ? (
