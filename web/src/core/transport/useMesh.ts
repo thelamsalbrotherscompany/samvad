@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { MeshTransport } from './MeshTransport'
 import { PionTransport } from './PionTransport'
-import type { ActivityEvent, Phase, RemotePeer, Transport } from './Transport'
+import type { ActivityEvent, EncryptionMode, Phase, RemotePeer, Transport } from './Transport'
 import type { PeerInfo } from './protocol'
 
 /** A handler for messages arriving on a plugin data topic. */
@@ -34,6 +34,8 @@ export type Mesh = {
   phase: Phase
   isHost: boolean
   lobbyOpen: boolean
+  /** The real encryption mode of the media path, straight from the transport. */
+  encryption: EncryptionMode
   peers: RemotePeer[]
   knocks: PeerInfo[]
   activity: ActivityEvent[]
@@ -60,6 +62,7 @@ export function useMesh(opts: Options): Mesh {
   const [phase, setPhase] = useState<Phase>('connecting')
   const [isHost, setIsHost] = useState(false)
   const [lobbyOpen, setLobbyOpenState] = useState(false)
+  const [encryption, setEncryption] = useState<EncryptionMode>('hop-by-hop')
   const [activity, setActivity] = useState<ActivityEvent[]>([])
   // Typed to the interface, not the concrete class: the app is transport-agnostic, so a
   // future RealtimeTransport / PionTransport drops in here with no UI changes.
@@ -90,6 +93,7 @@ export function useMesh(opts: Options): Mesh {
         subscribersRef.current.get(topic)?.forEach((h) => h(payload, from))
       },
       onActivity: (e: ActivityEvent) => setActivity((prev) => [...prev, e]),
+      onEncryption: setEncryption,
     }
     // Same constructor shape, so selection is the only line that knows the difference.
     const Ctor = opts.transport === 'sfu' ? PionTransport : MeshTransport
@@ -114,6 +118,7 @@ export function useMesh(opts: Options): Mesh {
       setPhase('connecting')
       setIsHost(false)
       setLobbyOpenState(false)
+      setEncryption('hop-by-hop')
     }
     // Identity/stream are pushed via their own effects — not deps here, so muting
     // doesn't tear down the call.
@@ -168,6 +173,7 @@ export function useMesh(opts: Options): Mesh {
     phase,
     isHost,
     lobbyOpen,
+    encryption,
     peers,
     knocks,
     activity,

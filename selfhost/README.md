@@ -62,8 +62,10 @@ cd web && bun run dev             # :5173
 
 Open the app with **`?sfu=1`** (e.g. `http://localhost:5173/?sfu=1#<room>`) in two tabs and
 join the same room. You get the full app UI — roster, lobby, names — with media through the
-SFU. The encryption badge honestly reads **“Transport encrypted only”**: this path is *not*
-E2EE yet (see below). Without `?sfu=1` the app uses the P2P mesh (E2EE) as normal.
+SFU. In **Chromium**, once the MLS group keys, the badge reads **“End-to-end encrypted”**
+(`sfu-e2ee`): media is encrypted before it reaches the SFU, which forwards ciphertext it can't
+read. Until it keys (or on a browser without Insertable Streams) it honestly reads
+**“Transport encrypted only”**. Without `?sfu=1` the app uses the P2P mesh (E2EE) as normal.
 
 ## Signalling
 
@@ -82,10 +84,11 @@ there is never glare. Clients only ever answer and trickle ICE.
   clean teardown. Compiles and `go vet`s clean.
 - ✅ Wired to the Samvad app: the browser `PionTransport` implements the client `Transport`
   interface and reuses the app's lobby/presence signalling. Opt in with `?sfu=1` (above).
-- ⏳ **Not E2EE yet.** The SFU forwards plain SRTP it *can* read, so `PionTransport` honestly
-  reports **hop-by-hop**. The next step wires the already-built `FrameCryptor` + `E2eeSession`
-  (Insertable Streams / MLS) onto this path, at which point the SFU forwards ciphertext it
-  cannot read — E2EE over a real relay, self-hosted, no Cloudflare involved.
-- ⏳ Data plugins (chat/reactions) have no SFU path yet (the SFU forwards no data channels);
-  one audio + one video per participant. Screen-share as a second video track, simulcast
-  layer selection, and bandwidth estimation are follow-ups.
+- ✅ **E2EE (Chromium).** `PionTransport` attaches the built `FrameCryptor` + `E2eeSession`
+  (Insertable Streams / MLS) to the SFU connection, keyed over a Durable-Object data relay
+  (MLS's untrusted delivery service). The SFU forwards **ciphertext it cannot read** — E2EE
+  over a real relay, self-hosted, no Cloudflare. Where Insertable Streams is unavailable the
+  transform doesn't attach and the badge honestly stays hop-by-hop.
+- ⏳ Data plugins (chat/reactions) over the SFU (the SFU forwards no data channels — the DO
+  relay could carry E2EE'd payloads); one audio + one video per participant. Screen-share as a
+  second video track, simulcast, and bandwidth estimation are follow-ups.

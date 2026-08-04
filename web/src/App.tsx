@@ -359,11 +359,10 @@ export default function App() {
               visible={chromeVisible}
               onShare={() => setShareOpen(true)}
               raisedHands={raisedHands}
-              // The indicator states the REAL mode, never an aspiration (Claude.md §6). Mesh
-              // is genuinely E2EE (P2P DTLS-SRTP, no middlebox). The Pion SFU path is not E2EE
-              // yet — the SFU forwards plain SRTP it can read — so it honestly reports
-              // hop-by-hop until Insertable-Streams/MLS frame encryption is wired onto it.
-              encryption={useSfu ? 'hop-by-hop' : 'mesh-e2ee'}
+              // The indicator states the REAL mode, straight from the transport (Claude.md §6).
+              // Mesh reports mesh-e2ee; the SFU path reports hop-by-hop until per-frame
+              // encryption is confirmed active, then sfu-e2ee. Never an aspiration.
+              encryption={mesh.encryption}
             />
             <ControlBar
               muted={muted}

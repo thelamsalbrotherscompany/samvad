@@ -1,5 +1,7 @@
 import type { ClientMessage, PeerInfo, ServerMessage } from './protocol'
-import type { RemotePeer, Transport, TransportHandlers } from './Transport'
+import type { EncryptionMode, RemotePeer, Transport, TransportHandlers } from './Transport'
+import { E2eeSession } from '@/core/crypto/E2eeSession'
+import { pipeThrough } from '@/core/crypto/frameCrypto'
 
 /**
  * Self-hosted SFU transport (Phase 6). Media flows through a **single** RTCPeerConnection to
@@ -54,12 +56,22 @@ export class PionTransport implements Transport {
   private iceServers: RTCIceServer[] = STUN_FALLBACK
   private iceReady: Promise<void> | null = null
   private selfId = ''
+  private isHost = false
   private identity: PeerInfo
   private closed = false
   private leaving = false
   private terminated = false
   private reconnectAttempts = 0
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+
+  // E2EE: MLS group key agreement over the DO data relay, driving per-frame AES-GCM on the
+  // SFU connection. `e2eeCapable` is whether the browser's Insertable Streams actually
+  // attached (Chromium today); until the group is keyed, frames flow in the clear.
+  private e2ee: E2eeSession | null = null
+  private e2eeCapable = false
+  private readonly dataHandlers = new Map<string, (payload: unknown, from: string) => void>()
+  private encryptionTimer: ReturnType<typeof setInterval> | null = null
+  private lastEncryption: EncryptionMode | null = null
 
   constructor(
     roomName: string,
@@ -148,12 +160,13 @@ export class PionTransport implements Transport {
     switch (msg.type) {
       case 'welcome':
         this.selfId = msg.selfId
+        this.isHost = msg.isHost
         this.handlers.onConnected(true)
         this.handlers.onPhase('admitted')
         this.handlers.onHost(msg.isHost)
         this.handlers.onLobbyOpen(msg.lobbyOpen)
         for (const peer of msg.peers) this.addPeer(peer)
-        // We're in — bring media up against the SFU.
+        // We're in — bring media (and its E2EE) up against the SFU.
         this.startSfu()
         break
 
@@ -191,21 +204,31 @@ export class PionTransport implements Transport {
         this.emitKnocks()
         break
       case 'role':
+        this.isHost = msg.isHost
         this.handlers.onHost(msg.isHost)
+        // The committer role follows the host — hand MLS over too.
+        this.e2ee?.setHost(msg.isHost)
         break
 
       case 'peer-joined':
         this.addPeer(msg.peer)
+        this.e2ee?.onPeerJoined(msg.peer.id)
         this.logActivity('joined', msg.peer.name)
         break
       case 'peer-left': {
         const name = this.peers.get(msg.id)?.name
         this.dropPeer(msg.id)
+        this.e2ee?.onPeerLeft(msg.id)
         if (name) this.logActivity('left', name)
         break
       }
       case 'peer-state':
         this.mergePeer(msg.peer)
+        break
+
+      // The MLS handshake (delivery service for E2EE) rides this relay.
+      case 'data':
+        this.dataHandlers.get(msg.topic)?.(msg.payload, msg.from)
         break
 
       // Media is the SFU's job here — the DO's peer-to-peer relay is mesh-only.
@@ -221,23 +244,52 @@ export class PionTransport implements Transport {
     if (this.sfuStarted) return
     this.sfuStarted = true
 
-    const pc = new RTCPeerConnection({ iceServers: this.iceServers })
+    // Insertable Streams lets us encrypt each frame before it reaches the SFU. The flag is
+    // Chromium-only; where it's unsupported it's ignored and the path stays honestly
+    // hop-by-hop (the frame transforms simply don't attach).
+    const config = {
+      iceServers: this.iceServers,
+      encodedInsertableStreams: true,
+    } as RTCConfiguration & { encodedInsertableStreams: boolean }
+    const pc = new RTCPeerConnection(config)
     this.pc = pc
+
+    // MLS group key agreement over the DO data relay (its untrusted delivery service),
+    // keying the per-frame AES-GCM cipher.
+    const e2ee = new E2eeSession(this.selfId, {
+      send: (topic, payload, opts) => this.sendToServer({ type: 'data', to: opts?.to, topic, payload }),
+      subscribe: (topic, handler) => {
+        this.dataHandlers.set(topic, handler)
+        return () => this.dataHandlers.delete(topic)
+      },
+    })
+    this.e2ee = e2ee
+    this.e2eeCapable = false
 
     // Publish our tracks under the one stream (shared msid). Adding them before the SFU's
     // first offer means the answer already advertises us — we start sending on round one.
+    // Each outgoing frame is encrypted (passthrough until the group is keyed).
     for (const track of this.localStream?.getTracks() ?? []) {
       this.publishStream.addTrack(track)
-      pc.addTrack(track, this.publishStream)
+      const sender = pc.addTrack(track, this.publishStream)
+      if (pipeThrough(sender, e2ee.cryptor.encryptStream())) this.e2eeCapable = true
     }
 
     pc.onicecandidate = (e) => {
       if (e.candidate) this.sendToSfu({ event: 'candidate', data: JSON.stringify(e.candidate) })
     }
-    pc.ontrack = (e) => this.onSfuTrack(e)
+    pc.ontrack = (e) => {
+      // Decrypt incoming frames (a no-op passthrough until we hold the group key).
+      pipeThrough(e.receiver, e2ee.cryptor.decryptStream())
+      this.onSfuTrack(e)
+    }
     pc.onconnectionstatechange = () => {
       if (pc.connectionState === 'failed') pc.restartIce()
     }
+
+    // Drive the handshake, and start reporting the honest mode as it flips clear → encrypted.
+    void e2ee.start(this.isHost)
+    this.startEncryptionWatch()
 
     const scheme = location.protocol === 'https:' ? 'wss' : 'ws'
     const ws = new WebSocket(`${scheme}://${location.host}/sfu?room=${encodeURIComponent(this.roomName)}`)
@@ -254,13 +306,29 @@ export class PionTransport implements Transport {
     ws.onclose = () => {
       // Reopen the media leg on an unexpected drop; the DO leg drives everything else.
       if (this.leaving || this.terminated || this.closed) return
-      this.sfuStarted = false
-      this.pc?.close()
-      this.pc = null
-      this.sfuWs = null
+      this.teardownMedia()
       setTimeout(() => {
         if (!this.leaving && !this.terminated && !this.closed) this.startSfu()
       }, 1000)
+    }
+  }
+
+  private startEncryptionWatch(): void {
+    if (this.encryptionTimer) return
+    this.encryptionTimer = setInterval(() => this.emitEncryption(), 500)
+    this.emitEncryption()
+  }
+
+  /**
+   * Report the REAL media encryption (Claude.md §6). Claim `sfu-e2ee` only when frames are
+   * actually being encrypted — the browser attached the Insertable-Streams transforms AND the
+   * MLS group has produced a key. Anything else is honestly `hop-by-hop`.
+   */
+  private emitEncryption(): void {
+    const mode: EncryptionMode = this.e2eeCapable && this.e2ee?.cryptor.ready ? 'sfu-e2ee' : 'hop-by-hop'
+    if (mode !== this.lastEncryption) {
+      this.lastEncryption = mode
+      this.handlers.onEncryption(mode)
     }
   }
 
@@ -303,6 +371,18 @@ export class PionTransport implements Transport {
 
   private teardownMedia(): void {
     this.sfuStarted = false
+    if (this.encryptionTimer) {
+      clearInterval(this.encryptionTimer)
+      this.encryptionTimer = null
+    }
+    this.e2ee?.stop()
+    this.e2ee = null
+    this.e2eeCapable = false
+    this.dataHandlers.clear()
+    if (this.lastEncryption !== null) {
+      this.lastEncryption = 'hop-by-hop'
+      this.handlers.onEncryption('hop-by-hop')
+    }
     this.sfuWs?.close()
     this.sfuWs = null
     this.pc?.close()

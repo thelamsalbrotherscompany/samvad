@@ -32,6 +32,9 @@ export type ClientMessage =
   | { type: 'signal'; to: string; kind: SignalKind; data: unknown }
   // Screen-share handshake on a PC of its own; `presenter` is whose screen it carries.
   | { type: 'screen-signal'; to: string; presenter: string; kind: SignalKind; data: unknown }
+  // Topic-addressed opaque data relay (broadcast, or unicast with `to`). The SFU path's MLS
+  // delivery service; mesh doesn't use it (its data rides the P2P channel).
+  | { type: 'data'; to?: string; topic: string; payload: unknown }
   | { type: 'admit'; id: string }
   | { type: 'deny'; id: string }
   | { type: 'set-lobby'; open: boolean }
@@ -55,3 +58,4 @@ export type ServerMessage =
   | { type: 'peer-state'; peer: PeerInfo }
   | { type: 'signal'; from: string; kind: SignalKind; data: unknown }
   | { type: 'screen-signal'; from: string; presenter: string; kind: SignalKind; data: unknown }
+  | { type: 'data'; from: string; topic: string; payload: unknown }

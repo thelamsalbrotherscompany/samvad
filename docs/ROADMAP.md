@@ -167,14 +167,26 @@ Phase 1 — that unchanged UI is the proof the abstraction was correct.
   management — publishes key packages, adds admitted peers (commit broadcast + welcome
   unicast), rotates on leave, and keeps the frame cipher keyed to the current epoch — all over
   the existing E2EE data channel
-- ⏳ Wiring it live: run the coordinator on the **SFU path**, sync MLS membership to the lobby,
-  and handle **host handoff** (transfer the committer role). The mesh is already E2EE, so this
-  only needs to switch on once media flows through a relay
-- Honest, always-visible encryption indicator: mesh-E2EE / SFU-E2EE / hop-by-hop
-- Documented, tested fallback for browsers lacking Insertable Streams
+- ✅ **Wired live onto the self-hosted SFU** (`PionTransport`): the coordinator runs on the SFU
+  path, driven over a new **Durable Object data relay** (`{type:'data'}`) — MLS's untrusted
+  delivery service, safe because the DO sees handshake bytes but never the media keys. MLS
+  membership tracks the lobby (`peer-joined`/`peer-left` → add/remove), and **host handoff** is
+  handled (`role` → `setHost`, transferring the committer). Frame transforms attach to the SFU
+  connection's senders/receivers; media flows in the clear only until the group keys, then is
+  encrypted. **This lands E2EE over a real relay — self-hosted, no Cloudflare needed.** ⏳ The
+  Cloudflare `RealtimeTransport` path (Phase 3) will reuse the identical crypto
+- ✅ **Honest, always-visible encryption indicator**: the transport reports the *real* mode
+  (`mesh-e2ee` / `sfu-e2ee` / `hop-by-hop`) reactively; `sfu-e2ee` is claimed only once frames
+  are provably being encrypted (transforms attached **and** a key derived) — never as an
+  aspiration (non-negotiable #6)
+- ✅ **Fallback for browsers lacking Insertable Streams**: `pipeThrough` returns false, no
+  transform attaches, and the indicator honestly stays `hop-by-hop` — the call still works
+- ⏳ E2EE plugin data (chat/reactions) over the SFU — the same MLS key can seal payloads on the
+  DO relay; not wired yet
 
 **Done when:** packet capture at the SFU yields no intelligible media, and the SFU's own
-logs demonstrably cannot reconstruct a frame.
+logs demonstrably cannot reconstruct a frame. *(Needs the 3-process local run in Chromium to
+confirm end-to-end — see `selfhost/README`.)*
 
 ---
 
@@ -206,11 +218,11 @@ logs demonstrably cannot reconstruct a frame.
     proving itself). Correlates a peer's SFU media to their roster entry with **no protocol
     change**: it rewrites its published msid to its DO id in the answer SDP, so every subscriber
     sees `stream.id === <publisher's id>`. Selection lives in `useMesh`; the UI is untouched.
-    Vite proxies `/sfu` → `:8088` in dev. ⚠️ **Not E2EE yet** — the SFU forwards plain SRTP it
-    can read, so the indicator honestly drops to **hop-by-hop**. ⏳ Next: wire the built
-    `FrameCryptor`/`E2eeSession` (Insertable Streams) onto this path to make it E2EE (finally
-    landing Phase 4 over a real relay, self-hosted — no Cloudflare needed), then **data plugins**
-    (chat/reactions have no SFU path yet), **screen-share** as a 2nd track, and **simulcast**
+    Vite proxies `/sfu` → `:8088` in dev. ✅ **E2EE wired** — the built `FrameCryptor` +
+    `E2eeSession` (Insertable Streams / MLS) attach to the SFU connection over a new DO data
+    relay, so the SFU forwards ciphertext it can't read; the indicator shows `sfu-e2ee` once
+    keyed (else honest `hop-by-hop`). See Phase 4. ⏳ Remaining: **data plugins** (chat/reactions
+    over the SFU), **screen-share** as a 2nd track, and **simulcast**
 - Published threat model, reviewed by someone who wasn't you
 - Reproducible builds; signed release binaries
 - `docs/SELF-HOSTING.md` — the one-binary path, and a TLS/reverse-proxy path

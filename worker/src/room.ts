@@ -217,6 +217,21 @@ export class RoomDO {
         }
         break
       }
+
+      case 'data': {
+        // Opaque relay — the MLS delivery service for the SFU path. Unicast if `to` is set,
+        // else broadcast to every other admitted peer. The payload is never interpreted.
+        if (self.status !== 'admitted') return
+        const out: ServerMessage = { type: 'data', from: self.id, topic: msg.topic, payload: msg.payload }
+        if (msg.to) {
+          const target = this.socketById(msg.to)
+          const ta = target ? this.attachmentOf(target) : null
+          if (target && ta?.status === 'admitted') this.send(target, out)
+        } else {
+          this.broadcastAdmitted(ws, out)
+        }
+        break
+      }
     }
   }
 

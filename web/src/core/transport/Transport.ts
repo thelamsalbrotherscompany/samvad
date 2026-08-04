@@ -32,6 +32,13 @@ export type ActivityEvent = {
   ts: number
 }
 
+/**
+ * The REAL encryption mode of the media path, reported by the transport — never an
+ * aspiration (Claude.md §6). Mesh is always `mesh-e2ee`. The SFU path is `hop-by-hop` until
+ * per-frame encryption is confirmed active, then `sfu-e2ee`.
+ */
+export type EncryptionMode = 'mesh-e2ee' | 'sfu-e2ee' | 'hop-by-hop'
+
 /** Callbacks a transport pushes up to the app. Same for every transport implementation. */
 export type TransportHandlers = {
   onPeers: (peers: RemotePeer[]) => void
@@ -43,6 +50,8 @@ export type TransportHandlers = {
   /** Plugin data on a topic (chat, reactions, …), from a peer. */
   onData: (topic: string, from: string, payload: unknown) => void
   onActivity: (e: ActivityEvent) => void
+  /** The real, current encryption mode of the media path. */
+  onEncryption: (mode: EncryptionMode) => void
 }
 
 /**

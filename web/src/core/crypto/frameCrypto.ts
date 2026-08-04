@@ -103,6 +103,13 @@ export class FrameCryptor {
   decryptStream(): TransformStream<EncodedFrame, EncodedFrame> {
     return new TransformStream({
       transform: async (frame, controller) => {
+        // Not keyed yet (E2EE handshake still in flight): media is flowing in the clear —
+        // the sender passes through too — so pass it on, never black it out. Once we hold a
+        // key, every real frame is encrypted and this branch no longer applies.
+        if (this.keys.size === 0) {
+          controller.enqueue(frame)
+          return
+        }
         const data = new Uint8Array(frame.data)
         const clear = headerBytes(frame)
         if (data.length < clear + 1 + IV_BYTES) {

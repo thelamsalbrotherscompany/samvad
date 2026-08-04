@@ -301,6 +301,8 @@ export class MeshTransport implements Transport {
         this.handlers.onPhase('admitted')
         this.handlers.onHost(msg.isHost)
         this.handlers.onLobbyOpen(msg.lobbyOpen)
+        // P2P mesh has no middlebox — genuinely E2EE by construction.
+        this.handlers.onEncryption('mesh-e2ee')
         // We're the newcomer: we call everyone already here. If we're mid-presentation
         // (a reconnect while sharing), re-offer our screen to each of them too.
         for (const peer of msg.peers) {

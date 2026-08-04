@@ -43,6 +43,11 @@ export type ClientMessage =
   // camera/mic connection. `presenter` is whose screen this is (always the offerer),
   // which lets a peer that is both presenting and viewing keep the two PCs apart.
   | { type: 'screen-signal'; to: string; presenter: string; kind: SignalKind; data: unknown }
+  // Opaque topic-addressed data, broadcast (no `to`) or unicast. The SFU path uses it as
+  // the MLS **delivery service** — safe because MLS treats the relay as untrusted: the DO
+  // can see handshake bytes but can never derive the media keys. Mesh doesn't use this (its
+  // data rides the P2P channel). `payload` is never interpreted by the server.
+  | { type: 'data'; to?: string; topic: string; payload: unknown }
   | { type: 'admit'; id: string } // host only
   | { type: 'deny'; id: string } // host only
   | { type: 'set-lobby'; open: boolean } // host only: open = anyone with the link joins
@@ -78,3 +83,5 @@ export type ServerMessage =
   | { type: 'signal'; from: string; kind: SignalKind; data: unknown }
   // Relayed screen-share handshake (see the client `screen-signal`).
   | { type: 'screen-signal'; from: string; presenter: string; kind: SignalKind; data: unknown }
+  // Relayed topic-addressed data (see the client `data`) — the MLS delivery service.
+  | { type: 'data'; from: string; topic: string; payload: unknown }
