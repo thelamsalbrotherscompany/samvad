@@ -236,7 +236,13 @@ confirm end-to-end — see `selfhost/README`.)*
 - Published threat model, reviewed by someone who wasn't you
 - Reproducible builds; signed release binaries
 - `docs/SELF-HOSTING.md` — the one-binary path, and a TLS/reverse-proxy path
-- Accessibility pass: keyboard-complete, screen-reader-labelled, WCAG AA contrast
+- ✅ **Accessibility pass**: `aria-live`/`role` on all dynamic status (reconnect, lobby phase,
+  encryption downgrade, knocks, chat, reactions, errors), accessible names on media (`<video>`
+  tiles/previews/screen-share) and inputs, `aria-pressed` only on real toggles, the hand-rolled
+  Mirror modal given `role=dialog`/`aria-modal`/focus management, and `--color-ink-faint` lifted
+  to meet **WCAG AA** (was ~2.9:1, now 4.5:1 on base/surface — verified with a computed-ratio
+  check across every text token pair). Keyboard-complete already (all real buttons + global
+  `:focus-visible`)
 - i18n, with नेपाली and हिन्दी as first-class rather than afterthoughts
 - Plugin authoring guide + template repository
 
